@@ -28,7 +28,6 @@
 #include <set>
 #include <vector>
 #include <string>
-//#include <openssl/sha.h>
 #include "ns3/socket.h"
 #include "ns3/nstime.h"
 #include "ns3/timer.h"
@@ -46,8 +45,10 @@ class GUChord : public GUApplication
 
     void SendPing (Ipv4Address destAddress, std::string pingMessage);
     void RecvMessage (Ptr<Socket> socket);
+    void SetMainInterface (uint32_t mainInterface);   //retrieve device address
     void ProcessPingReq (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessPingRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);      //process message for joining network
     void AuditPings ();
     uint32_t GetNextTransactionId ();
     void StopChord ();
@@ -59,6 +60,7 @@ class GUChord : public GUApplication
 
     // From GUApplication
     virtual void ProcessCommand (std::vector<std::string> tokens);
+
     
   protected:
     virtual void DoDispose ();
@@ -79,6 +81,14 @@ class GUChord : public GUApplication
     Callback <void, Ipv4Address, std::string> m_pingSuccessFn;
     Callback <void, Ipv4Address, std::string> m_pingFailureFn;
     Callback <void, Ipv4Address, std::string> m_pingRecvFn;
+    
+    Ipv4Address m_mainAddress;  //contain address of this node
+    //Ptr<Ipv4> m_ipv4;           ////
+
+    Ipv4Address successor;      //next node
+    Ipv4Address predecessor;    //previous node
+    bool online;                //flag if node is on network
+    bool is_landmark;           //flag if node is landmark
 };
 
 #endif

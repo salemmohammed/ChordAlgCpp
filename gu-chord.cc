@@ -101,6 +101,12 @@ GUChord::StopApplication (void)
 }
 
 void
+GUChord::SetMainInterface (uint32_t mainInterface)
+{
+  //m_mainAddress = m_ipv4->GetAddress (mainInterface, 0).GetLocal ();
+}
+
+void
 GUChord::ProcessCommand (std::vector<std::string> tokens)
 {
   std::vector<std::string>::iterator iterator = tokens.begin();
@@ -113,7 +119,7 @@ GUChord::SendPing (Ipv4Address destAddress, std::string pingMessage)
   if (destAddress != Ipv4Address::GetAny ())
     {
       uint32_t transactionId = GetNextTransactionId ();
-      CHORD_LOG ("Sending PING_REQ to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " Message: " << pingMessage << " transactionId: " << transactionId << "Hey there");
+      CHORD_LOG ("Sending PING_REQ to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " Message: " << pingMessage << " transactionId: " << transactionId);
       Ptr<PingRequest> pingRequest = Create<PingRequest> (transactionId, Simulator::Now(), destAddress, pingMessage);
       // Add to ping-tracker
       m_pingTracker.insert (std::make_pair (transactionId, pingRequest));
@@ -140,7 +146,6 @@ GUChord::RecvMessage (Ptr<Socket> socket)
   uint16_t sourcePort = inetSocketAddr.GetPort ();
   GUChordMessage message;
   packet->RemoveHeader (message);
-
 
   switch (message.GetMessageType ())
     {
@@ -190,6 +195,36 @@ GUChord::ProcessPingRsp (GUChordMessage message, Ipv4Address sourceAddress, uint
   else
     {
       DEBUG_LOG ("Received invalid PING_RSP!");
+    }
+}
+
+void    //Process Chord Join message and set landmark/successors
+GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort)
+{
+  // Remove from pingTracker
+  std::map<uint32_t, Ptr<PingRequest> >::iterator iter;
+  iter = m_pingTracker.find (message.GetTransactionId ());
+  if (iter != m_pingTracker.end ())
+    {
+      std::string fromNode = ReverseLookup (sourceAddress);
+      CHORD_LOG ("Received CHORD_JOIN, From Node: " << fromNode);
+      m_pingTracker.erase (iter);
+      // Send indication to application layer
+      m_pingSuccessFn (sourceAddress, message.GetPingRsp().pingMessage);
+
+
+      //test if creating landmark (is target address equal to source address)
+      if(sourceAddress == m_mainAddress)
+        is_landmark = true;
+      else
+        is_landmark = false;
+
+      online = true;  //flag as on-network
+    }
+  else
+    {
+      DEBUG_LOG ("Received invalid CHORD_JOIN!");
+      online = false;   //flag as off-network
     }
 }
 
