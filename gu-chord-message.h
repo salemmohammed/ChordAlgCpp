@@ -37,7 +37,7 @@ class GUChordMessage : public Header
       {
         PING_REQ = 1,
         PING_RSP = 2,
-        CHRD_START = 3,      
+        CHORD_JOIN = 3,      
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -101,7 +101,7 @@ class GUChordMessage : public Header
         // Payload
         std::string pingMessage;
       };
-    struct ChordStart
+    struct ChordJoin
       {
         void Print (std::ostream &os) const;
         uint32_t GetSerializedSize (void) const;
@@ -116,7 +116,7 @@ class GUChordMessage : public Header
       {
         PingReq pingReq;
         PingRsp pingRsp;
-        ChordStart createMessage;
+        ChordJoin joinMessage;
       } m_message;
     
   public:
@@ -142,11 +142,13 @@ class GUChordMessage : public Header
      */
     void SetPingRsp (std::string message);
 
-    //Get & Set for ChordStart
+    //Get & Set for ChordJoin
     
-    ChordStart GetChordStart ();
+    ChordJoin GetChordJoin ();
    
-    void SetChordStart ();
+    void SetChordJoin ();
+
+
 
 }; // class GUChordMessage
 
