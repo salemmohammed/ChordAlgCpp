@@ -46,6 +46,11 @@ class GUChord : public GUApplication
     void SendPing (Ipv4Address destAddress, std::string pingMessage);
     void RecvMessage (Ptr<Socket> socket);
     void SetMainInterface (uint32_t mainInterface);   //retrieve device address
+    void SendJoinRequest(Ipv4Address destAddress);    //Method to send out join message to landmark node
+    void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
+    void FindSuccessor();
+    void FindPredecessor();
+    void ClosestPrecedingFinger();
     void ProcessPingReq (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessPingRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);      //process message for joining network

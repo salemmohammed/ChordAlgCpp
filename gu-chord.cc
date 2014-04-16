@@ -111,6 +111,35 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
 {
   std::vector<std::string>::iterator iterator = tokens.begin();
   std::string command = *iterator;
+
+  //ADDED COMMANDS IN ASSIGNMENT SHEET
+
+  if (command == "JOIN")
+    {
+      if (tokens.size() < 2)
+        {
+          ERROR_LOG ("Insufficient CHORD params..."); 
+          return;
+        }
+      iterator++;
+      std::istringstream sin (*iterator);
+      uint32_t nodeNumber;
+      sin >> nodeNumber;
+
+      /*if( nodeNumber == ReverseLookup(m_mainAddress) ){
+                SetSelfToLandmark();
+      }*/
+  }else if (command == "LEAVE"){
+
+      std::cout<<"I'm out."<<std::endl;
+
+  }else if (command == "RINGSTATE"){
+
+      std::cout<<"Print ring state" << std::endl;
+
+  }
+
+
 }
 
 void
@@ -136,6 +165,42 @@ GUChord::SendPing (Ipv4Address destAddress, std::string pingMessage)
     }
 }
 
+//Send a Join Message to attempt to join a Chord Network
+void
+GUChord::SendJoinRequest(Ipv4Address destAddress)
+{
+
+
+}
+
+//Set local node to be landmark node by changing boolean values and succ, predecessor
+void
+GUChord::SetSelfToLandmark(){
+
+        /*Pseudocode: Can't implement because we don't know how to access own ip
+                predecessor = nil;
+                successor = n;
+        */
+
+
+}
+
+/* Implementation of Chord */
+void
+GUChord::FindSuccessor(){
+
+}
+void
+GUChord::FindPredecessor(){
+
+}
+void
+GUChord::ClosestPrecedingFinger(){
+
+}
+/*****************/
+
+
 void
 GUChord::RecvMessage (Ptr<Socket> socket)
 {
@@ -155,6 +220,8 @@ GUChord::RecvMessage (Ptr<Socket> socket)
       case GUChordMessage::PING_RSP:
         ProcessPingRsp (message, sourceAddress, sourcePort);
         break;
+      case GUChordMessage::CHORD_JOIN:
+        ProcessChordJoin(message, sourceAddress, sourcePort);
       default:
         ERROR_LOG ("Unknown Message Type!");
         break;
@@ -213,11 +280,11 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
       m_pingSuccessFn (sourceAddress, message.GetPingRsp().pingMessage);
 
 
-      //test if creating landmark (is target address equal to source address)
+      /*//test if creating landmark (is target address equal to source address)
       if(sourceAddress == m_mainAddress)
         is_landmark = true;
       else
-        is_landmark = false;
+        is_landmark = false;*/
 
       online = true;  //flag as on-network
     }
