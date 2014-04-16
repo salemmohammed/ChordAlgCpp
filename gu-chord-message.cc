@@ -66,6 +66,9 @@ GUChordMessage::GetSerializedSize (void) const
       case PING_RSP:
         size += m_message.pingRsp.GetSerializedSize ();
         break;
+      case CHORD_JOIN:
+        size += m_message.joinMessage.GetSerializedSize ();
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -88,6 +91,8 @@ GUChordMessage::Print (std::ostream &os) const
       case PING_RSP:
         m_message.pingRsp.Print (os);
         break;
+      case CHORD_JOIN:
+        m_message.joinMessage.Print (os);
       default:
         break;  
     }
@@ -109,6 +114,8 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
       case PING_RSP:
         m_message.pingRsp.Serialize (i);
         break;
+      case CHORD_JOIN:
+        m_message.joinMessage.Serialize (i);
       default:
         NS_ASSERT (false);   
     }
@@ -132,6 +139,8 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
       case PING_RSP:
         size += m_message.pingRsp.Deserialize (i);
         break;
+      case CHORD_JOIN:
+        size += m_message.joinMessage.Deserialize (i);
       default:
         NS_ASSERT (false);
     }
@@ -250,6 +259,55 @@ GUChordMessage::GetPingRsp ()
 //
 //
 //
+
+/******                 CHORD JOIN METHODS                      ********/
+
+
+uint32_t
+GUChordMessage::ChordJoin::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = sizeof(uint16_t);
+  return size;
+}
+void
+GUChordMessage::ChordJoin::Print (std::ostream &os) const
+{
+  os << "ChordJoin \n";
+}
+void
+GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
+{
+
+}
+uint32_t
+GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
+{
+  return ChordJoin::GetSerializedSize ();
+}
+void
+GUChordMessage::SetChordJoin ()
+{
+   if (m_messageType == 3)
+      {
+        m_messageType = CHORD_JOIN;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == CHORD_JOIN);
+      }
+}
+
+GUChordMessage::ChordJoin
+GUChordMessage::GetChordJoin ()
+{
+  return m_message.joinMessage;
+}
+
+
+
+/**************************************************************************/
+
 
 void
 GUChordMessage::SetMessageType (MessageType messageType)
