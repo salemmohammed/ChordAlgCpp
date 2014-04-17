@@ -45,7 +45,9 @@ class GUChord : public GUApplication
 
     void SendPing (Ipv4Address destAddress, std::string pingMessage);
     void RecvMessage (Ptr<Socket> socket);
-    void SetMainInterface (uint32_t mainInterface);   //retrieve device address
+    std::string GetNodeNumber();
+    Ipv4Address GetMainInterface ();   //retrieve device address
+    uint32_t getNodeID(uint32_t n);              //Compute Hash Value
     void SendJoinRequest(Ipv4Address destAddress);    //Method to send out join message to landmark node
     void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
     void FindSuccessor();
@@ -86,14 +88,13 @@ class GUChord : public GUApplication
     Callback <void, Ipv4Address, std::string> m_pingSuccessFn;
     Callback <void, Ipv4Address, std::string> m_pingFailureFn;
     Callback <void, Ipv4Address, std::string> m_pingRecvFn;
-    
-    Ipv4Address m_mainAddress;  //contain address of this node
-    //Ptr<Ipv4> m_ipv4;           ////
 
-    Ipv4Address successor;      //next node
-    Ipv4Address predecessor;    //previous node
+    //Ipv4Address m_mainAddress;
+    uint32_t successor;      //next node
+    uint32_t predecessor;    //previous node
     bool online;                //flag if node is on network
     bool is_landmark;           //flag if node is landmark
+    uint32_t hashedNodeID;      //Computed ID
 };
 
 #endif

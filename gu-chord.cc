@@ -21,6 +21,10 @@
 
 #include "ns3/random-variable.h"
 #include "ns3/inet-socket-address.h"
+//#include <openssl/sha.h>
+#include <string>
+#include <sstream>
+#include <iostream>
 
 using namespace ns3;
 
@@ -75,7 +79,10 @@ GUChord::StartApplication (void)
       InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny(), m_appPort);
       m_socket->Bind (local);
       m_socket->SetRecvCallback (MakeCallback (&GUChord::RecvMessage, this));
-    }  
+    }
+        
+   hashedNodeID = getNodeID(8);  
+   //m_mainAddress = GetMainInterface();
   
   // Configure timers
   m_auditPingsTimer.SetFunction (&GUChord::AuditPings, this);
@@ -101,12 +108,6 @@ GUChord::StopApplication (void)
 }
 
 void
-GUChord::SetMainInterface (uint32_t mainInterface)
-{
-  //m_mainAddress = m_ipv4->GetAddress (mainInterface, 0).GetLocal ();
-}
-
-void
 GUChord::ProcessCommand (std::vector<std::string> tokens)
 {
   std::vector<std::string>::iterator iterator = tokens.begin();
@@ -126,9 +127,20 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
       uint32_t nodeNumber;
       sin >> nodeNumber;
 
-      /*if( nodeNumber == ReverseLookup(m_mainAddress) ){
+      std::string thisNodeNum = GetNodeNumber();
+
+      std::stringstream sd;
+      sd << nodeNumber;
+      std::string str;
+      sd >> str;
+
+      if( thisNodeNum == str ){
                 SetSelfToLandmark();
-      }*/
+      }else{
+                //General Join
+
+
+      }
   }else if (command == "LEAVE"){
 
       std::cout<<"I'm out."<<std::endl;
@@ -165,6 +177,43 @@ GUChord::SendPing (Ipv4Address destAddress, std::string pingMessage)
     }
 }
 
+
+std::string
+GUChord::GetNodeNumber(){
+
+      std::stringstream ss;
+      ss << GetNode()->GetId();
+      std::string str;
+      ss >> str;
+
+      return str;
+
+}
+Ipv4Address
+GUChord::GetMainInterface()
+{
+      return ResolveNodeIpAddress(GetNodeNumber());
+}
+uint32_t
+GUChord::getNodeID( uint32_t n ){
+
+        uint8_t seperateBytes[4];
+
+        Ipv4Address mainAddress = GetMainInterface();
+        mainAddress.Serialize(seperateBytes);
+        uint32_t totalValue = seperateBytes[0] + seperateBytes[1] + seperateBytes[2] + seperateBytes[3];
+        return totalValue % n;
+
+      //Test SHA 1 Hashing (doesn't work yet)
+      /*unsigned char *message = "yourmom";
+      unsigned char *result;
+      uint32_t messagelength = sizeof(char);
+      
+
+      SHA1(message, messagelength, result);
+      */
+} 
+
 //Send a Join Message to attempt to join a Chord Network
 void
 GUChord::SendJoinRequest(Ipv4Address destAddress)
@@ -181,9 +230,13 @@ GUChord::SetSelfToLandmark(){
                 predecessor = nil;
                 successor = n;
         */
+        successor = hashedNodeID;
+        is_landmark = true;
 
 
 }
+
+
 
 /* Implementation of Chord */
 void
