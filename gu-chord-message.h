@@ -37,7 +37,8 @@ class GUChordMessage : public Header
       {
         PING_REQ = 1,
         PING_RSP = 2,
-        CHORD_JOIN = 3,      
+        CHORD_JOIN = 3,
+        CHORD_JOIN_RSP = 4,      
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -108,6 +109,18 @@ class GUChordMessage : public Header
         void Serialize (Buffer::Iterator &start) const;
         uint32_t Deserialize (Buffer::Iterator &start);
         // Payload
+        std::string requesterID;
+        Ipv4Address originatorAddress;
+      };
+    struct ChordJoinRsp
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        //Payload
+        Ipv4Address successorVal;
+        Ipv4Address predecessorVal;
       };
 
 
@@ -117,6 +130,7 @@ class GUChordMessage : public Header
         PingReq pingReq;
         PingRsp pingRsp;
         ChordJoin joinMessage;
+        ChordJoinRsp joinResponse;
       } m_message;
     
   public:
@@ -146,7 +160,11 @@ class GUChordMessage : public Header
     
     ChordJoin GetChordJoin ();
    
-    void SetChordJoin ();
+    void SetChordJoin (std::string rqID,Ipv4Address originAddr);
+
+    ChordJoinRsp GetChordJoinRsp ();
+    
+    void SetChordJoinRsp (Ipv4Address succ, Ipv4Address pred);
 
 
 

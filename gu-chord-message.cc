@@ -69,6 +69,9 @@ GUChordMessage::GetSerializedSize (void) const
       case CHORD_JOIN:
         size += m_message.joinMessage.GetSerializedSize ();
         break;
+      case CHORD_JOIN_RSP:
+        size += m_message.joinResponse.GetSerializedSize ();
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -93,6 +96,10 @@ GUChordMessage::Print (std::ostream &os) const
         break;
       case CHORD_JOIN:
         m_message.joinMessage.Print (os);
+        break;
+      case CHORD_JOIN_RSP:
+        m_message.joinResponse.Print (os);
+        break;
       default:
         break;  
     }
@@ -116,6 +123,10 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
         break;
       case CHORD_JOIN:
         m_message.joinMessage.Serialize (i);
+        break;
+      case CHORD_JOIN_RSP:
+        m_message.joinResponse.Serialize (i);
+        break;
       default:
         NS_ASSERT (false);   
     }
@@ -141,6 +152,10 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case CHORD_JOIN:
         size += m_message.joinMessage.Deserialize (i);
+        break;
+      case CHORD_JOIN_RSP:
+        size += m_message.joinResponse.Deserialize (i);
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -267,28 +282,41 @@ uint32_t
 GUChordMessage::ChordJoin::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = sizeof(uint16_t);
+  size = IPV4_ADDRESS_SIZE + sizeof(uint16_t) + requesterID.length();
   return size;
 }
 void
 GUChordMessage::ChordJoin::Print (std::ostream &os) const
 {
-  os << "ChordJoin \n";
+  os << "ChordJoin::requesterID: " << requesterID << "\n";
 }
 void
 GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
 {
-
+  start.WriteU16 (requesterID.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
+  start.WriteHtonU32 (originatorAddress.Get ());
+        
 }
 uint32_t
 GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
 {
+
+  uint16_t length = start.ReadU16 ();
+  char* str = (char*) malloc (length);
+  start.Read ((uint8_t*)str, length);
+  requesterID = std::string (str, length);
+  free (str);
+
+  originatorAddress = Ipv4Address (start.ReadNtohU32 ());
   return ChordJoin::GetSerializedSize ();
+
+
 }
 void
-GUChordMessage::SetChordJoin ()
+GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr )
 {
-   if (m_messageType == 3)
+   if (m_messageType == 0)
       {
         m_messageType = CHORD_JOIN;
       }
@@ -296,12 +324,66 @@ GUChordMessage::SetChordJoin ()
       {
         NS_ASSERT (m_messageType == CHORD_JOIN);
       }
+        m_message.joinMessage.requesterID = rqID;
+        m_message.joinMessage.originatorAddress = originAddr;
 }
 
 GUChordMessage::ChordJoin
 GUChordMessage::GetChordJoin ()
 {
   return m_message.joinMessage;
+}
+
+
+
+/************************       CHORD JOIN RESPONSE METHODS                  ******************************/
+
+
+uint32_t
+GUChordMessage::ChordJoinRsp::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t);
+  return size;
+}
+void
+GUChordMessage::ChordJoinRsp::Print (std::ostream &os) const
+{
+  os << "ChordJoinRsp::succ: "<< successorVal <<" pred: " << predecessorVal <<"\n";
+}
+void
+GUChordMessage::ChordJoinRsp::Serialize (Buffer::Iterator &start) const
+{
+        start.WriteHtonU32 (successorVal.Get ());
+        start.WriteHtonU32 (predecessorVal.Get ());
+}
+uint32_t
+GUChordMessage::ChordJoinRsp::Deserialize (Buffer::Iterator &start)
+{
+
+  successorVal = Ipv4Address (start.ReadNtohU32 ());
+  predecessorVal = Ipv4Address (start.ReadNtohU32 ());
+  return ChordJoinRsp::GetSerializedSize ();
+}
+void
+GUChordMessage::SetChordJoinRsp ( Ipv4Address succ, Ipv4Address pred )
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = CHORD_JOIN_RSP;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == CHORD_JOIN_RSP);
+      }
+        m_message.joinResponse.successorVal = succ;
+        m_message.joinResponse.predecessorVal = pred;
+}
+
+GUChordMessage::ChordJoinRsp
+GUChordMessage::GetChordJoinRsp ()
+{
+  return m_message.joinResponse;
 }
 
 
