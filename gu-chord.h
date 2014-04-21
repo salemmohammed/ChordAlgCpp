@@ -49,8 +49,10 @@ class GUChord : public GUApplication
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr, uint32_t n);              //Compute Hash Value
     void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAdress);    //Method to send out join message to landmark node
-    void SendJoinResponse(Ipv4Address destAddress, Ipv4Address successor, Ipv4Address predecessor);   //Method to send back the correct pred and succ to join requester
+    void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
+    void SendStableReq(Ipv4Address destAddress);
+    void SendStableRsp(Ipv4Address destAddress);
     void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
     void FindSuccessor();
     void FindPredecessor();
@@ -60,6 +62,8 @@ class GUChord : public GUApplication
     void ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);      //process message for joining network
     void ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);          //Process message when node in network finds the correct succ. and pred. for a join request
     void PrintRingState(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void AuditPings ();
     uint32_t GetNextTransactionId ();
     void StopChord ();
