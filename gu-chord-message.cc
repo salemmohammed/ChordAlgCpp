@@ -72,6 +72,9 @@ GUChordMessage::GetSerializedSize (void) const
       case CHORD_JOIN_RSP:
         size += m_message.joinResponse.GetSerializedSize ();
         break;
+      case RING_STATE:
+        size += m_message.rs.GetSerializedSize ();
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -100,6 +103,9 @@ GUChordMessage::Print (std::ostream &os) const
       case CHORD_JOIN_RSP:
         m_message.joinResponse.Print (os);
         break;
+      case RING_STATE:
+        m_message.rs.Print (os);
+        break;
       default:
         break;  
     }
@@ -126,6 +132,9 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
         break;
       case CHORD_JOIN_RSP:
         m_message.joinResponse.Serialize (i);
+        break;
+      case RING_STATE:
+        m_message.rs.Serialize (i);
         break;
       default:
         NS_ASSERT (false);   
@@ -155,6 +164,9 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case CHORD_JOIN_RSP:
         size += m_message.joinResponse.Deserialize (i);
+        break;
+      case RING_STATE:
+        size += m_message.rs.Deserialize (i);
         break;
       default:
         NS_ASSERT (false);
@@ -388,8 +400,63 @@ GUChordMessage::GetChordJoinRsp ()
 
 
 
-/**************************************************************************/
+/************************** RING STATE MESSAGE **********************************/
 
+
+uint32_t
+GUChordMessage::RingState::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = sizeof(uint16_t) + originatorNodeID.length();
+  return size;
+}
+void
+GUChordMessage::RingState::Print (std::ostream &os) const
+{
+  os << "Ring State message \n";
+}
+void
+GUChordMessage::RingState::Serialize (Buffer::Iterator &start) const
+{
+        start.WriteU16 (originatorNodeID.length ());
+        start.Write ((uint8_t *) (const_cast<char*> (originatorNodeID.c_str())), originatorNodeID.length());
+  
+}
+uint32_t
+GUChordMessage::RingState::Deserialize (Buffer::Iterator &start)
+{
+
+  uint16_t length = start.ReadU16 ();
+  char* str = (char*) malloc (length);
+  start.Read ((uint8_t*)str, length);
+  originatorNodeID = std::string (str, length);
+  free (str);
+  
+  return RingState::GetSerializedSize ();
+}
+void
+GUChordMessage::SetRingState ( std::string origin )
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = RING_STATE;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == RING_STATE);
+      }
+        m_message.rs.originatorNodeID = origin;
+}
+
+GUChordMessage::RingState
+GUChordMessage::GetRingState ()
+{
+  return m_message.rs;
+}
+
+
+
+/********************************************************************/
 
 void
 GUChordMessage::SetMessageType (MessageType messageType)

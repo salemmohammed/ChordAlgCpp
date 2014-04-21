@@ -38,7 +38,8 @@ class GUChordMessage : public Header
         PING_REQ = 1,
         PING_RSP = 2,
         CHORD_JOIN = 3,
-        CHORD_JOIN_RSP = 4,      
+        CHORD_JOIN_RSP = 4,
+        RING_STATE = 5,      
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -122,6 +123,15 @@ class GUChordMessage : public Header
         Ipv4Address successorVal;
         Ipv4Address predecessorVal;
       };
+    struct RingState
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        std::string originatorNodeID;
+      };
+
 
 
   private:
@@ -131,6 +141,7 @@ class GUChordMessage : public Header
         PingRsp pingRsp;
         ChordJoin joinMessage;
         ChordJoinRsp joinResponse;
+        RingState rs;
       } m_message;
     
   public:
@@ -165,6 +176,10 @@ class GUChordMessage : public Header
     ChordJoinRsp GetChordJoinRsp ();
     
     void SetChordJoinRsp (Ipv4Address succ, Ipv4Address pred);
+        
+    RingState GetRingState ();
+        
+    void SetRingState (std::string origin);
 
 
 
