@@ -39,7 +39,9 @@ class GUChordMessage : public Header
         PING_RSP = 2,
         CHORD_JOIN = 3,
         CHORD_JOIN_RSP = 4,
-        RING_STATE = 5,      
+        RING_STATE = 5,
+        STABLE_REQ = 6,
+        STABLE_RSP = 7,      
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -131,6 +133,27 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         std::string originatorNodeID;
       };
+    struct StableReq
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        // Payload
+        std::string requesterID;
+        Ipv4Address originatorAddress;
+        Ipv4Address successorAddress;
+      };
+    struct StableRsp
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        //Payload
+        Ipv4Address predecessorAddress;
+        bool is_stable;
+      };
 
 
 
@@ -142,6 +165,8 @@ class GUChordMessage : public Header
         ChordJoin joinMessage;
         ChordJoinRsp joinResponse;
         RingState rs;
+        StableReq stableMessage;
+        StableRsp stableResponse;
       } m_message;
     
   public:
@@ -180,6 +205,16 @@ class GUChordMessage : public Header
     RingState GetRingState ();
         
     void SetRingState (std::string origin);
+
+    //Get & Set for Stable Request and Response
+   
+    StableReq GetStableReq ();
+
+    void SetStableReq (std::string rqID, Ipv4Address originAddr, Ipv4Address successorAddr);
+
+    StableRsp GetStableRsp ();
+
+    void SetStableRsp (Ipv4Address pred, bool status);
 
 
 
