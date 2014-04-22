@@ -75,6 +75,9 @@ GUChordMessage::GetSerializedSize (void) const
       case RING_STATE:
         size += m_message.rs.GetSerializedSize ();
         break;
+      case CHORD_LEAVE:
+        size += m_message.leaveMessage.GetSerializedSize ();
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -112,6 +115,9 @@ GUChordMessage::Print (std::ostream &os) const
       case STABLE_RSP:
         m_message.stableResponse.Print (os);
         break;
+      case CHORD_LEAVE:
+        m_message.leaveMessage.Print (os);
+        break;
       default:
         break;  
     }
@@ -141,6 +147,9 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
         break;
       case RING_STATE:
         m_message.rs.Serialize (i);
+        break;
+      case CHORD_LEAVE:
+        m_message.leaveMessage.Serialize (i);
         break;
       default:
         NS_ASSERT (false);   
@@ -173,6 +182,9 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case RING_STATE:
         size += m_message.rs.Deserialize (i);
+        break;
+      case CHORD_LEAVE:
+        size += m_message.leaveMessage.Deserialize (i);
         break;
       default:
         NS_ASSERT (false);
@@ -579,8 +591,65 @@ GUChordMessage::GetStableRsp ()
 
 
 
-/********************************************************************/
+/************************************      CHORD LEAVE METHODS        ********************************/
 
+uint32_t
+GUChordMessage::ChordLeave::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t);
+  return size;
+}
+void
+GUChordMessage::ChordLeave::Print (std::ostream &os) const
+{
+  os << "ChordJoin\n";
+}
+void
+GUChordMessage::ChordLeave::Serialize (Buffer::Iterator &start) const
+{
+  start.WriteHtonU32 (successorAddress.Get ());
+  start.WriteHtonU32 (predecessorAddress.Get ());
+        
+}
+uint32_t
+GUChordMessage::ChordLeave::Deserialize (Buffer::Iterator &start)
+{
+
+  successorAddress = Ipv4Address (start.ReadNtohU32 ());
+  predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
+  
+  return ChordLeave::GetSerializedSize ();
+
+
+}
+void
+GUChordMessage::SetChordLeave ( Ipv4Address successor, Ipv4Address predecessor )
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = CHORD_LEAVE;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == CHORD_LEAVE);
+      }
+        
+        m_message.leaveMessage.successorAddress = successor;
+        m_message.leaveMessage.predecessorAddress = predecessor;
+}
+
+GUChordMessage::ChordLeave
+GUChordMessage::GetChordLeave ()
+{
+  return m_message.leaveMessage;
+}
+
+
+
+
+
+/******************************************************************************************************/
 void
 GUChordMessage::SetMessageType (MessageType messageType)
 {

@@ -83,7 +83,6 @@ GUChord::StartApplication (void)
    
    m_mainAddress = GetMainInterface();
    nodeID = getNodeID(m_mainAddress, 8);
-   is_landmark = false;  
   // Configure timers
   m_auditPingsTimer.SetFunction (&GUChord::AuditPings, this);
   // Start timers
@@ -211,7 +210,6 @@ GUChord::SetSelfToLandmark(){
         //pseudocode: predecessor = nil
         successor = nodeID;
         succIP = m_mainAddress;
-        is_landmark = true;
 
 } 
 
@@ -447,6 +445,13 @@ GUChord::ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uin
 void
 GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
+
+}
+
+void
+GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
+
+   
 
 }
 

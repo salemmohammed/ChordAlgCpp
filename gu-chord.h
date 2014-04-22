@@ -53,6 +53,7 @@ class GUChord : public GUApplication
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
     void SendStableReq(Ipv4Address destAddress);
     void SendStableRsp(Ipv4Address destAddress);
+    void SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);
     void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
     void FindSuccessor();
     void FindPredecessor();
@@ -64,6 +65,7 @@ class GUChord : public GUApplication
     void PrintRingState(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void AuditPings ();
     uint32_t GetNextTransactionId ();
     void StopChord ();
@@ -102,8 +104,8 @@ class GUChord : public GUApplication
     Ipv4Address predIP;
     std::string successor;      //next node
     std::string predecessor;    //previous node
-    bool is_landmark;           //flag if node is landmark
     std::string nodeID;      //Computed ID
+    bool is_last;
 };
 
 #endif
