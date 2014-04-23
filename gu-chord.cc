@@ -141,9 +141,13 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
                 std::cout<<"sending join request."<<std::endl;
                 std::string landmark = "1";
                 Ipv4Address landmarkIP = ResolveNodeIpAddress(landmark);
-                SendJoinRequest(landmarkIP, m_mainAddress);
+                SendJoinRequest(ResolveNodeIpAddress(nodeNumber), m_mainAddress);
       }
   }else if (command == "LEAVE"){
+
+      //send leave requests to successor and predecessor
+      SendLeaveRequest(succIP, succIP, predIP);    
+      SendLeaveRequest(predIP, succIP, predIP);
 
       std::cout<<"I'm out."<<std::endl;
 
@@ -301,6 +305,32 @@ GUChord::SendStableRsp(Ipv4Address destAddress){
 
 
 }
+
+void
+GUChord::SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred){
+
+if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending CHORD_LEAVE to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_LEAVE, transactionId);
+      
+      message.SetChordLeave (succ, pred);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"LEAVE REQUEST FAILED" <<std::endl;
+    }
+
+
+}
+
 void
 GUChord::RecvMessage (Ptr<Socket> socket)
 {
@@ -334,6 +364,9 @@ GUChord::RecvMessage (Ptr<Socket> socket)
         break;
       case GUChordMessage::STABLE_RSP:
         ProcessStableRsp(message, sourceAddress, sourcePort);
+        break;
+      case GUChordMessage::CHORD_LEAVE:
+        ProcessChordLeave(message, sourceAddress, sourcePort);
         break;
       default:
         ERROR_LOG ("Unknown Message Type!");
@@ -451,7 +484,13 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
 void
 GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
-   
+    if( sourceAddress == succIP ) {          //check if successor is leaving
+       succIP = message.GetChordLeave().successorAddress;
+       successor = getNodeID(succIP, 8);
+    }else if( sourceAddress == predIP ) {    //check if predecessor is leaving
+       predIP = message.GetChordLeave().predecessorAddress;
+       predecessor = getNodeID(predIP, 8);
+    }
 
 }
 
