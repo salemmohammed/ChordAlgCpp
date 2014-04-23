@@ -141,7 +141,7 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
                 std::cout<<"sending join request."<<std::endl;
                 std::string landmark = "1";
                 Ipv4Address landmarkIP = ResolveNodeIpAddress(landmark);
-                SendJoinRequest(ResolveNodeIpAddress(nodeNumber), m_mainAddress);
+                SendJoinRequest(ResolveNodeIpAddress(str), m_mainAddress);
       }
   }else if (command == "LEAVE"){
 
