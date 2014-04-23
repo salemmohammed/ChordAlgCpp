@@ -48,7 +48,7 @@ class GUChord : public GUApplication
     std::string GetNodeNumber();
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr, uint32_t n);              //Compute Hash Value
-    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAdress);    //Method to send out join message to landmark node
+    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAdress, Ipv4Address landmarkAddress);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
     void SendStableReq(Ipv4Address destAddress);

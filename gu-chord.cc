@@ -141,7 +141,7 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
                 std::cout<<"sending join request."<<std::endl;
                 std::string landmark = "1";
                 Ipv4Address landmarkIP = ResolveNodeIpAddress(landmark);
-                SendJoinRequest(ResolveNodeIpAddress(str), m_mainAddress);
+                SendJoinRequest(ResolveNodeIpAddress(str), m_mainAddress, ResolveNodeIpAddress(str));
       }
   }else if (command == "LEAVE"){
 
@@ -219,7 +219,7 @@ GUChord::SetSelfToLandmark(){
 
 //Send a Join Message to attempt to join a Chord Network
 void
-GUChord::SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress)
+GUChord::SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress)
 {
 
 if (destAddress != Ipv4Address::GetAny ())
@@ -231,7 +231,7 @@ if (destAddress != Ipv4Address::GetAny ())
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_JOIN, transactionId);
       
-      message.SetChordJoin (nodeID, srcAddress);
+      message.SetChordJoin (nodeID, srcAddress, landmarkAddress);
       packet->AddHeader (message);
       m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
     }
@@ -393,6 +393,7 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
         
         std::string messageNodeID = message.GetChordJoin().requesterID;
         Ipv4Address originAddress = message.GetChordJoin().originatorAddress;
+        Ipv4Address landmarkIP = message.GetChordJoin().landmarkAddress;
 
         std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
         
@@ -427,7 +428,7 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
                 
                 //Create a CHORD_JOIN message and send it to Ipv4Address succIP
                 std::cout << "NodeID needs to be passed to next successor" << std::endl;
-                SendJoinRequest(succIP, originAddress);
+                SendJoinRequest(succIP, originAddress, landmarkIP);
         }else{
                 std::cout<<"Fuckme"<<std::endl;
 

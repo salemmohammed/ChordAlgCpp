@@ -312,7 +312,7 @@ uint32_t
 GUChordMessage::ChordJoin::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = IPV4_ADDRESS_SIZE + sizeof(uint16_t) + requesterID.length();
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length();
   return size;
 }
 void
@@ -326,6 +326,7 @@ GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
   start.WriteU16 (requesterID.length ());
   start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
   start.WriteHtonU32 (originatorAddress.Get ());
+  start.WriteHtonU32 (landmarkAddress.Get ());
         
 }
 uint32_t
@@ -339,12 +340,14 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
   free (str);
 
   originatorAddress = Ipv4Address (start.ReadNtohU32 ());
+  landmarkAddress = Ipv4Address (start.ReadNtohU32 ());
+
   return ChordJoin::GetSerializedSize ();
 
 
 }
 void
-GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr )
+GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr, Ipv4Address landmarkAddr )
 {
    if (m_messageType == 0)
       {
@@ -356,6 +359,7 @@ GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr )
       }
         m_message.joinMessage.requesterID = rqID;
         m_message.joinMessage.originatorAddress = originAddr;
+        m_message.joinMessage.landmarkAddress = landmarkAddr;
 }
 
 GUChordMessage::ChordJoin
