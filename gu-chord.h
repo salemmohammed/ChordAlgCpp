@@ -45,13 +45,14 @@ class GUChord : public GUApplication
 
     void SendPing (Ipv4Address destAddress, std::string pingMessage);
     void RecvMessage (Ptr<Socket> socket);
+    void startSendingStableReq();
     std::string GetNodeNumber();
     Ipv4Address GetMainInterface ();   //retrieve device address
-    std::string getNodeID(Ipv4Address addr, uint32_t n);              //Compute Hash Value
-    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAdress, Ipv4Address landmarkAddress);    //Method to send out join message to landmark node
-    void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);   //Method to send back the correct pred and succ to join requester
+    std::string getNodeID(Ipv4Address addr);              //Compute Hash Value
+    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId);    //Method to send out join message to landmark node
+    void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
-    void SendStableReq(Ipv4Address destAddress);
+    void SendStableReq(Ipv4Address destAddress, std::string reqID);
     void SendStableRsp(Ipv4Address destAddress);
     void SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);
     void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
@@ -89,9 +90,12 @@ class GUChord : public GUApplication
     uint32_t m_currentTransactionId;
     Ptr<Socket> m_socket;
     Time m_pingTimeout;
+    Time m_sendStableTimeout;
+    
     uint16_t m_appPort;
     // Timers
     Timer m_auditPingsTimer;
+    Timer m_sendStableTimer;
     // Ping tracker
     std::map<uint32_t, Ptr<PingRequest> > m_pingTracker;
     // Callbacks
@@ -106,6 +110,7 @@ class GUChord : public GUApplication
     std::string predecessor;    //previous node
     std::string nodeID;      //Computed ID
     bool is_last;
+    bool is_landmark;
 };
 
 #endif

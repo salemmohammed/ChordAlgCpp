@@ -75,6 +75,12 @@ GUChordMessage::GetSerializedSize (void) const
       case RING_STATE:
         size += m_message.rs.GetSerializedSize ();
         break;
+      case STABLE_REQ:
+        size += m_message.stableMessage.GetSerializedSize ();
+        break;
+      case STABLE_RSP:
+        size += m_message.stableResponse.GetSerializedSize ();
+        break;
       case CHORD_LEAVE:
         size += m_message.leaveMessage.GetSerializedSize ();
         break;
@@ -148,6 +154,12 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
       case RING_STATE:
         m_message.rs.Serialize (i);
         break;
+      case STABLE_REQ:
+        m_message.stableMessage.Serialize (i);
+        break;
+      case STABLE_RSP:
+        m_message.stableResponse.Serialize (i);
+        break;
       case CHORD_LEAVE:
         m_message.leaveMessage.Serialize (i);
         break;
@@ -182,6 +194,12 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case RING_STATE:
         size += m_message.rs.Deserialize (i);
+        break;
+      case STABLE_REQ:
+        size += m_message.stableMessage.Deserialize (i);
+        break;
+      case STABLE_RSP:
+        size += m_message.stableResponse.Deserialize (i);
         break;
       case CHORD_LEAVE:
         size += m_message.leaveMessage.Deserialize (i);
@@ -312,8 +330,8 @@ uint32_t
 GUChordMessage::ChordJoin::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length();
-  return size;
+  size = (3*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length() + landmarkSuccessor.length();
+  return 10*size;
 }
 void
 GUChordMessage::ChordJoin::Print (std::ostream &os) const
@@ -325,6 +343,11 @@ GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
 {
   start.WriteU16 (requesterID.length ());
   start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
+
+  start.WriteU16 (landmarkSuccessor.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (landmarkSuccessor.c_str())), landmarkSuccessor.length());
+
+  start.WriteHtonU32 (landmarkSuccIP.Get ());
   start.WriteHtonU32 (originatorAddress.Get ());
   start.WriteHtonU32 (landmarkAddress.Get ());
         
@@ -339,6 +362,13 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
   requesterID = std::string (str, length);
   free (str);
 
+  uint16_t length2 = start.ReadU16 ();
+  char* str2 = (char*) malloc (length2);
+  start.Read ((uint8_t*)str2, length2);
+  landmarkSuccessor = std::string (str2, length2);
+  free (str2);
+
+  landmarkSuccIP = Ipv4Address (start.ReadNtohU32 ());
   originatorAddress = Ipv4Address (start.ReadNtohU32 ());
   landmarkAddress = Ipv4Address (start.ReadNtohU32 ());
 
@@ -347,7 +377,7 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
 
 }
 void
-GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr, Ipv4Address landmarkAddr )
+GUChordMessage::SetChordJoin ( std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr )
 {
    if (m_messageType == 0)
       {
@@ -358,6 +388,8 @@ GUChordMessage::SetChordJoin ( std::string rqID, Ipv4Address originAddr, Ipv4Add
         NS_ASSERT (m_messageType == CHORD_JOIN);
       }
         m_message.joinMessage.requesterID = rqID;
+        m_message.joinMessage.landmarkSuccessor = landmarkSucc;
+        m_message.joinMessage.landmarkSuccIP = lmSuccIP;
         m_message.joinMessage.originatorAddress = originAddr;
         m_message.joinMessage.landmarkAddress = landmarkAddr;
 }
@@ -377,30 +409,36 @@ uint32_t
 GUChordMessage::ChordJoinRsp::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t);
+  size = (IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + newSucc.length();
   return size;
 }
 void
 GUChordMessage::ChordJoinRsp::Print (std::ostream &os) const
 {
-  os << "ChordJoinRsp::succ: "<< successorVal <<" pred: " << predecessorVal <<"\n";
+  os << "ChordJoinRsp::succ: "<< successorVal <<"\n";
 }
 void
 GUChordMessage::ChordJoinRsp::Serialize (Buffer::Iterator &start) const
 {
+        start.WriteU16 (newSucc.length ());
+        start.Write ((uint8_t *) (const_cast<char*> (newSucc.c_str())), newSucc.length());
         start.WriteHtonU32 (successorVal.Get ());
-        start.WriteHtonU32 (predecessorVal.Get ());
 }
 uint32_t
 GUChordMessage::ChordJoinRsp::Deserialize (Buffer::Iterator &start)
 {
 
+  uint16_t length = start.ReadU16 ();
+  char* str = (char*) malloc (length);
+  start.Read ((uint8_t*)str, length);
+  newSucc = std::string (str, length);
+  free (str);
+
   successorVal = Ipv4Address (start.ReadNtohU32 ());
-  predecessorVal = Ipv4Address (start.ReadNtohU32 ());
   return ChordJoinRsp::GetSerializedSize ();
 }
 void
-GUChordMessage::SetChordJoinRsp ( Ipv4Address succ, Ipv4Address pred )
+GUChordMessage::SetChordJoinRsp ( std::string succVal, Ipv4Address succ)
 {
    if (m_messageType == 0)
       {
@@ -410,8 +448,8 @@ GUChordMessage::SetChordJoinRsp ( Ipv4Address succ, Ipv4Address pred )
       {
         NS_ASSERT (m_messageType == CHORD_JOIN_RSP);
       }
+        m_message.joinResponse.newSucc = succVal;
         m_message.joinResponse.successorVal = succ;
-        m_message.joinResponse.predecessorVal = pred;
 }
 
 GUChordMessage::ChordJoinRsp
@@ -500,8 +538,9 @@ GUChordMessage::StableReq::Serialize (Buffer::Iterator &start) const
 {
   start.WriteU16 (requesterID.length ());
   start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
-  start.WriteHtonU32 (originatorAddress.Get ());
+  
   start.WriteHtonU32 (successorAddress.Get ());
+  start.WriteHtonU32 (predecessorAddress.Get ());
         
 }
 uint32_t
@@ -514,15 +553,15 @@ GUChordMessage::StableReq::Deserialize (Buffer::Iterator &start)
   requesterID = std::string (str, length);
   free (str);
 
-  originatorAddress = Ipv4Address (start.ReadNtohU32 ());
   successorAddress = Ipv4Address (start.ReadNtohU32 ());
+  predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
 
   return StableReq::GetSerializedSize ();
 
 
 }
 void
-GUChordMessage::SetStableReq ( std::string rqID, Ipv4Address originAddr, Ipv4Address successorAddr )
+GUChordMessage::SetStableReq ( std::string rqID, Ipv4Address predecessorAddr, Ipv4Address successorAddr )
 {
    if (m_messageType == 0)
       {
@@ -533,8 +572,8 @@ GUChordMessage::SetStableReq ( std::string rqID, Ipv4Address originAddr, Ipv4Add
         NS_ASSERT (m_messageType == STABLE_REQ);
       }
         m_message.stableMessage.requesterID = rqID;
-        m_message.stableMessage.originatorAddress = originAddr;
         m_message.stableMessage.successorAddress = successorAddr;
+        m_message.stableMessage.predecessorAddress = predecessorAddr;
 }
 
 GUChordMessage::StableReq
@@ -550,7 +589,7 @@ uint32_t
 GUChordMessage::StableRsp::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = IPV4_ADDRESS_SIZE + sizeof(uint16_t) + sizeof(uint8_t);
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + sizeof(uint8_t);
   return size;
 }
 void
@@ -561,19 +600,20 @@ GUChordMessage::StableRsp::Print (std::ostream &os) const
 void
 GUChordMessage::StableRsp::Serialize (Buffer::Iterator &start) const
 {
+        start.WriteHtonU32 (successorAddress.Get ());
         start.WriteHtonU32 (predecessorAddress.Get ());
         start.WriteU8 (is_stable);
 }
 uint32_t
 GUChordMessage::StableRsp::Deserialize (Buffer::Iterator &start)
 {
-
+  successorAddress = Ipv4Address (start.ReadNtohU32 ());
   predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
   is_stable = start.ReadU8 ();
   return StableRsp::GetSerializedSize ();
 }
 void
-GUChordMessage::SetStableRsp ( Ipv4Address pred, bool status )
+GUChordMessage::SetStableRsp ( Ipv4Address pred, Ipv4Address succ, bool status )
 {
    if (m_messageType == 0)
       {
@@ -583,6 +623,7 @@ GUChordMessage::SetStableRsp ( Ipv4Address pred, bool status )
       {
         NS_ASSERT (m_messageType == STABLE_RSP);
       }
+        m_message.stableResponse.successorAddress = succ;
         m_message.stableResponse.predecessorAddress = pred;
         m_message.stableResponse.is_stable = status;
 }

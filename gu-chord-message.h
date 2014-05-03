@@ -114,6 +114,8 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         // Payload
         std::string requesterID;
+        std::string landmarkSuccessor;
+        Ipv4Address landmarkSuccIP;
         Ipv4Address originatorAddress;
         Ipv4Address landmarkAddress;
       };
@@ -124,8 +126,8 @@ class GUChordMessage : public Header
         void Serialize (Buffer::Iterator &start) const;
         uint32_t Deserialize (Buffer::Iterator &start);
         //Payload
+        std::string newSucc;
         Ipv4Address successorVal;
-        Ipv4Address predecessorVal;
       };
     struct RingState
       {
@@ -143,7 +145,7 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         // Payload
         std::string requesterID;
-        Ipv4Address originatorAddress;
+        Ipv4Address predecessorAddress;
         Ipv4Address successorAddress;
       };
     struct StableRsp
@@ -154,6 +156,7 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         //Payload
         Ipv4Address predecessorAddress;
+        Ipv4Address successorAddress;
         bool is_stable;
       };
     struct ChordLeave
@@ -209,11 +212,11 @@ class GUChordMessage : public Header
     
     ChordJoin GetChordJoin ();
    
-    void SetChordJoin (std::string rqID,Ipv4Address originAddr, Ipv4Address landmarkAddr);
+    void SetChordJoin (std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr);
 
     ChordJoinRsp GetChordJoinRsp ();
     
-    void SetChordJoinRsp (Ipv4Address succ, Ipv4Address pred);
+    void SetChordJoinRsp (std::string succVal, Ipv4Address succ);
         
     RingState GetRingState ();
         
@@ -223,11 +226,11 @@ class GUChordMessage : public Header
    
     StableReq GetStableReq ();
 
-    void SetStableReq (std::string rqID, Ipv4Address originAddr, Ipv4Address successorAddr);
+    void SetStableReq (std::string rqID, Ipv4Address predecessorAddr, Ipv4Address successorAddr);
 
     StableRsp GetStableRsp ();
 
-    void SetStableRsp (Ipv4Address pred, bool status);
+    void SetStableRsp (Ipv4Address pred, Ipv4Address succ, bool status);
 
     ChordLeave GetChordLeave ();
         
