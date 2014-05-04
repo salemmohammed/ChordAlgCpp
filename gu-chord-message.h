@@ -156,6 +156,26 @@ class GUChordMessage : public Header
         std::string predID;
         Ipv4Address predAddress;
       };
+    struct SetPred
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        //Payload
+        std::string newPredID;
+        Ipv4Address newPredIP;
+      };
+    struct Notify
+      {
+        void Print (std::ostream &os) const;
+        uint32_t GetSerializedSize (void) const;
+        void Serialize (Buffer::Iterator &start) const;
+        uint32_t Deserialize (Buffer::Iterator &start);
+        //Payload
+        std::string potentialPredID;
+        Ipv4Address potentialPredIP;
+      };    
     struct ChordLeave
       {
         void Print (std::ostream &os) const;
@@ -163,8 +183,11 @@ class GUChordMessage : public Header
         void Serialize (Buffer::Iterator &start) const;
         uint32_t Deserialize (Buffer::Iterator &start);
         //Payload
+        std::string successorID;
+        std::string predecessorID;        
         Ipv4Address successorAddress;
         Ipv4Address predecessorAddress;
+        
       };
 
 
@@ -179,6 +202,8 @@ class GUChordMessage : public Header
         RingState rs;
         StableReq stableMessage;
         StableRsp stableResponse;
+        SetPred setPredMessage;
+        Notify notifyMessage;
         ChordLeave leaveMessage;
       } m_message;
     
@@ -227,9 +252,17 @@ class GUChordMessage : public Header
 
     void SetStableRsp (std::string predId, Ipv4Address predIp);
 
+    SetPred GetSetPred ();
+    
+    void SetSetPred (std::string newPredId, Ipv4Address newPredIp);
+
+    Notify GetNotify ();
+        
+    void SetNotify (std::string potPredId, Ipv4Address potPredIp);
+
     ChordLeave GetChordLeave ();
         
-    void SetChordLeave (Ipv4Address successor, Ipv4Address predecessor);
+    void SetChordLeave (std::string sId, std::string pId, Ipv4Address successor, Ipv4Address predecessor);
 
 
 

@@ -81,6 +81,12 @@ GUChordMessage::GetSerializedSize (void) const
       case STABLE_RSP:
         size += m_message.stableResponse.GetSerializedSize ();
         break;
+      case SET_PRED:
+        size += m_message.setPredMessage.GetSerializedSize ();
+        break;
+      case NOTIFY:
+        size += m_message.notifyMessage.GetSerializedSize ();
+        break;
       case CHORD_LEAVE:
         size += m_message.leaveMessage.GetSerializedSize ();
         break;
@@ -121,6 +127,12 @@ GUChordMessage::Print (std::ostream &os) const
       case STABLE_RSP:
         m_message.stableResponse.Print (os);
         break;
+      case SET_PRED:
+        m_message.setPredMessage.Print (os);
+        break;
+      case NOTIFY:
+        m_message.notifyMessage.Print (os);
+        break;
       case CHORD_LEAVE:
         m_message.leaveMessage.Print (os);
         break;
@@ -159,6 +171,12 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
         break;
       case STABLE_RSP:
         m_message.stableResponse.Serialize (i);
+        break;
+      case SET_PRED:
+        m_message.setPredMessage.Serialize (i);
+        break;
+      case NOTIFY:
+        m_message.notifyMessage.Serialize (i);
         break;
       case CHORD_LEAVE:
         m_message.leaveMessage.Serialize (i);
@@ -200,6 +218,12 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case STABLE_RSP:
         size += m_message.stableResponse.Deserialize (i);
+        break;
+      case SET_PRED:
+        size += m_message.setPredMessage.Deserialize (i);
+        break;
+      case NOTIFY:
+        size += m_message.notifyMessage.Deserialize (i);
         break;
       case CHORD_LEAVE:
         size += m_message.leaveMessage.Deserialize (i);
@@ -566,7 +590,6 @@ GUChordMessage::GetStableReq ()
 
 /************************       STABILIZE RESPONSE METHODS                  ******************************/
 
-//std::string predID; Ipv4Address predAddress;
 uint32_t
 GUChordMessage::StableRsp::GetSerializedSize (void) const
 {
@@ -624,6 +647,125 @@ GUChordMessage::GetStableRsp ()
 }
 
 
+/************************************      SET PRED METHODS           ********************************/
+
+uint32_t
+GUChordMessage::SetPred::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = (IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + newPredID.length();
+  return size;
+}
+void
+GUChordMessage::SetPred::Print (std::ostream &os) const
+{
+  os << "SetPred\n";
+}
+void
+GUChordMessage::SetPred::Serialize (Buffer::Iterator &start) const
+{
+
+        start.WriteU16 (newPredID.length ());
+        start.Write ((uint8_t *) (const_cast<char*> (newPredID.c_str())), newPredID.length());
+
+        start.WriteHtonU32 (newPredIP.Get ());
+}
+uint32_t
+GUChordMessage::SetPred::Deserialize (Buffer::Iterator &start)
+{
+
+        uint16_t length = start.ReadU16 ();
+        char* str = (char*) malloc (length);
+        start.Read ((uint8_t*)str, length);
+        newPredID = std::string (str, length);
+        free (str);
+
+        newPredIP = Ipv4Address (start.ReadNtohU32 ());
+
+        return SetPred::GetSerializedSize ();
+}
+void
+GUChordMessage::SetSetPred (std::string newPredId, Ipv4Address newPredIp)
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = SET_PRED;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == SET_PRED);
+      }
+        m_message.setPredMessage.newPredID = newPredId;
+        m_message.setPredMessage.newPredIP = newPredIp;
+}
+
+GUChordMessage::SetPred
+GUChordMessage::GetSetPred ()
+{
+  return m_message.setPredMessage;
+}
+
+
+/************************************      NOTIFY METHODS             ********************************/
+
+//std::string potentialPredID;   Ipv4Address potentialPredIP;
+uint32_t
+GUChordMessage::Notify::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = (IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + potentialPredID.length();
+  return size;
+}
+void
+GUChordMessage::Notify::Print (std::ostream &os) const
+{
+  os << "Notify\n";
+}
+void
+GUChordMessage::Notify::Serialize (Buffer::Iterator &start) const
+{
+
+        start.WriteU16 (potentialPredID.length ());
+        start.Write ((uint8_t *) (const_cast<char*> (potentialPredID.c_str())), potentialPredID.length());
+
+        start.WriteHtonU32 (potentialPredIP.Get ());
+}
+uint32_t
+GUChordMessage::Notify::Deserialize (Buffer::Iterator &start)
+{
+
+        uint16_t length = start.ReadU16 ();
+        char* str = (char*) malloc (length);
+        start.Read ((uint8_t*)str, length);
+        potentialPredID = std::string (str, length);
+        free (str);
+
+        potentialPredIP = Ipv4Address (start.ReadNtohU32 ());
+
+        return Notify::GetSerializedSize ();
+}
+void
+GUChordMessage::SetNotify (std::string potPredId, Ipv4Address potPredIp)
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = NOTIFY;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == NOTIFY);
+      }
+        m_message.notifyMessage.potentialPredID = potPredId;
+        m_message.notifyMessage.potentialPredIP = potPredIp;
+}
+
+GUChordMessage::Notify
+GUChordMessage::GetNotify ()
+{
+  return m_message.notifyMessage;
+}
+
+
 
 /************************************      CHORD LEAVE METHODS        ********************************/
 
@@ -631,8 +773,8 @@ uint32_t
 GUChordMessage::ChordLeave::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t);
-  return size;
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + successorID.length() + predecessorID.length();
+  return 30*size;
 }
 void
 GUChordMessage::ChordLeave::Print (std::ostream &os) const
@@ -642,6 +784,13 @@ GUChordMessage::ChordLeave::Print (std::ostream &os) const
 void
 GUChordMessage::ChordLeave::Serialize (Buffer::Iterator &start) const
 {
+
+  start.WriteU16 (successorID.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (successorID.c_str())), successorID.length());
+  
+  start.WriteU16 (predecessorID.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (predecessorID.c_str())), predecessorID.length());
+
   start.WriteHtonU32 (successorAddress.Get ());
   start.WriteHtonU32 (predecessorAddress.Get ());
         
@@ -650,15 +799,25 @@ uint32_t
 GUChordMessage::ChordLeave::Deserialize (Buffer::Iterator &start)
 {
 
-  successorAddress = Ipv4Address (start.ReadNtohU32 ());
-  predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
-  
-  return ChordLeave::GetSerializedSize ();
+        uint16_t length = start.ReadU16 ();
+        char* str = (char*) malloc (length);
+        start.Read ((uint8_t*)str, length);
+        successorID = std::string (str, length);
+        free (str);
 
+        uint16_t length2 = start.ReadU16 ();
+        char* str2 = (char*) malloc (length2);
+        start.Read ((uint8_t*)str2, length2);
+        predecessorID = std::string (str, length);
+        free (str);
 
+        successorAddress = Ipv4Address (start.ReadNtohU32 ());
+        predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
+          
+        return ChordLeave::GetSerializedSize ();
 }
 void
-GUChordMessage::SetChordLeave ( Ipv4Address successor, Ipv4Address predecessor )
+GUChordMessage::SetChordLeave ( std::string sId, std::string pId, Ipv4Address successor, Ipv4Address predecessor)
 {
    if (m_messageType == 0)
       {

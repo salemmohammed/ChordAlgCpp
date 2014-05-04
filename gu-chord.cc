@@ -47,7 +47,7 @@ GUChord::GetTypeId ()
                    MakeTimeChecker ())
     .AddAttribute ("SendStableMessageTimeout",
                  "Timeout value for STABLE_REQ in milliseconds",
-                 TimeValue (MilliSeconds (10000)),
+                 TimeValue (MilliSeconds (20000)),
                  MakeTimeAccessor (&GUChord::m_sendStableTimeout),
                  MakeTimeChecker ())
     ;
@@ -86,6 +86,7 @@ GUChord::StartApplication (void)
       m_socket->Bind (local);
       m_socket->SetRecvCallback (MakeCallback (&GUChord::RecvMessage, this));
     }
+
    
    m_mainAddress = GetMainInterface();
    nodeID = getNodeID(m_mainAddress);
@@ -95,7 +96,7 @@ GUChord::StartApplication (void)
   m_sendStableTimer.SetFunction (&GUChord::startSendingStableReq, this);
   // Start timers
   m_auditPingsTimer.Schedule (m_pingTimeout);
-  //m_sendStableTimer.Schedule (m_sendStableTimeout);
+  m_sendStableTimer.Schedule (m_sendStableTimeout);
 }
 
 void
@@ -117,6 +118,14 @@ GUChord::StopApplication (void)
 
 /***********************************************************************************/
 
+void 
+GUChord::startSendingStableReq(){
+
+        SendStableReq(succIP);
+
+        m_sendStableTimer.Schedule (m_sendStableTimeout);
+
+}
 void
 GUChord::ProcessCommand (std::vector<std::string> tokens)
 {
@@ -151,13 +160,14 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
       }
   }else if (command == "LEAVE"){
 
+      
       //send leave requests to successor and predecessor
-      SendLeaveRequest(succIP, succIP, predIP);    
-      SendLeaveRequest(predIP, succIP, predIP);
+      SendLeaveRequest(succIP, succIP, predIP, successor, predecessor);    
+      SendLeaveRequest(predIP, succIP, predIP, successor, predecessor);
 
   }else if (command == "RINGSTATE"){
 
-        std::cout<<"Chord ID: " << nodeID << "  Succ ID: " << successor << std::endl;
+        std::cout<<"\nPred ID: "<<predecessor<<"\nChord ID: " << nodeID << "\nSucc ID: " << successor << std::endl<<std::endl;
 
         CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << nodeID << " Successor: " << successor << " Predecessor: " << predecessor );
 
@@ -171,11 +181,6 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
 
 }
 
-void
-GUChord::startSendingStableReq(){
-
-        
-}
 std::string
 GUChord::GetNodeNumber(){
 
@@ -240,9 +245,6 @@ GUChord::SetSelfToLandmark(){
 
         successor = nodeID;
         succIP = m_mainAddress;
-        //std::cout<<"\n\nLandmark ID: "<<nodeID<<std::endl;
-        //std::cout<<"\nSuccessor ID: "<<successor<<std::endl;
-
 } 
 
 //Send a Join Message to attempt to join a Chord Network
@@ -319,10 +321,11 @@ GUChord::SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID){
 void
 GUChord::SendStableReq(Ipv4Address destAddress){
 
-  if (destAddress != Ipv4Address::GetAny ())
+//std::cout<<"Sending stabilize request"<<std::endl;
+  if (destAddress != Ipv4Address::GetAny () )
     {
       uint32_t transactionId = GetNextTransactionId ();
-      CHORD_LOG ("Sending STABLE_REQ to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      CHORD_LOG ("Sending STABLE_REQ to Node: " << ReverseLookup(succIP) << " IP: " << destAddress << " transactionId: " << transactionId);
       
       
       Ptr<Packet> packet = Create<Packet> ();
@@ -346,6 +349,7 @@ GUChord::SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4A
     {
       uint32_t transactionId = GetNextTransactionId ();
       CHORD_LOG ("Sending STABLE_RSP to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+        //std::cout<<"Sending STABLE_RSP"<<std::endl;
       
       
       Ptr<Packet> packet = Create<Packet> ();
@@ -361,12 +365,59 @@ GUChord::SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4A
       std::cout<<"STABLE RSP FAILED" <<std::endl;
     }
 
+}
+
+void
+GUChord::SendSetPred(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr){
+
+        if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending SET_PRED to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::SET_PRED, transactionId);
+      
+      message.SetSetPred (ndId, ndAddr);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"SET PREDECESSOR FAILED" <<std::endl;
+    }
+
+}
+
+void
+GUChord::SendNotify(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr){
+
+        if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending NOTIFY to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::NOTIFY, transactionId);
+      
+      message.SetNotify (ndId, ndAddr);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"NOTIFY FAILED" <<std::endl;
+    }
 
 
 }
 
 void
-GUChord::SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred){
+GUChord::SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred, std::string sucIp, std::string predIp){
 
 if (destAddress != Ipv4Address::GetAny ())
     {
@@ -377,7 +428,7 @@ if (destAddress != Ipv4Address::GetAny ())
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_LEAVE, transactionId);
       
-      message.SetChordLeave (succ, pred);
+      message.SetChordLeave (sucIp, predIp, succ, pred);
       packet->AddHeader (message);
       m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
     }
@@ -424,6 +475,12 @@ GUChord::RecvMessage (Ptr<Socket> socket)
       case GUChordMessage::STABLE_RSP:
         ProcessStableRsp(message, sourceAddress, sourcePort);
         break;
+      case GUChordMessage::SET_PRED:
+        ProcessSetPred(message, sourceAddress, sourcePort);
+        break;
+      case GUChordMessage::NOTIFY:
+        ProcessNotify(message, sourceAddress, sourcePort);
+        break;
       case GUChordMessage::CHORD_LEAVE:
         ProcessChordLeave(message, sourceAddress, sourcePort);
         break;
@@ -433,19 +490,6 @@ GUChord::RecvMessage (Ptr<Socket> socket)
     }
 }
 
-/* Implementation of Chord */
-void
-GUChord::FindSuccessor(){
-
-}
-void
-GUChord::FindPredecessor(){
-
-}
-void
-GUChord::ClosestPrecedingFinger(){
-
-}
 void    
 GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort)
 {
@@ -455,7 +499,7 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
         Ipv4Address landmarkIP = message.GetChordJoin().landmarkAddress;
         std::string landmarkID = getNodeID(landmarkIP);
 
-        std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
+        //std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
         
         
         if( messageNodeID < successor || successor < nodeID){
@@ -488,9 +532,8 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
 
                 SendJoinResponse(originAddress, m_mainAddress, nodeID);
                 
-                succIP = predIP = originAddress;
-                successor = predecessor = messageNodeID;
-
+                succIP = originAddress;
+                successor = messageNodeID;
         }       
 }
 void
@@ -512,7 +555,7 @@ GUChord::PrintRingState(GUChordMessage message, Ipv4Address sourceAddress, uint1
         if(  origin != nodeID ){
                 CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << nodeID << " Successor: " << successor << " Predecessor: " << predecessor );
 
-                std::cout<<"Chord ID: " << nodeID << "  Succ ID: " << successor << std::endl;
+                std::cout<<"Pred ID: "<<predecessor<<"\nChord ID: " << nodeID << "\nSucc ID: " << successor << std::endl<<std::endl;
                 
                 SendRingStateMessage(succIP, origin);
 
@@ -526,10 +569,13 @@ GUChord::ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uin
         
         if( sourceAddress != m_mainAddress ){    
                 
-                if( predecessor == "" )
+                if( predecessor == "" ){
+                        //std::cout<<"not set"<<std::endl;
                         SendStableRsp(sourceAddress, nodeID, m_mainAddress);
-                else
+                }else{
+                        //std::cout<<"set"<<std::endl;
                         SendStableRsp(sourceAddress, predecessor, predIP);
+                }
 
         }
 
@@ -541,20 +587,69 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
         std::string prdID = message.GetStableRsp().predID;
         Ipv4Address prdIP = message.GetStableRsp().predAddress;
 
+        
+
         if( prdID == successor || prdIP == succIP ){
-                std::cout<<"Successor's predecessor not set"<<std::endl;
-                //successor's predecessor not set, so send a set predecessor message
+                //successor's predecessor not set, so send a set predecessor message to successor
+                if( succIP != m_mainAddress ){
+                        //std::cout<<"StableMessageRecieved"<<std::endl;
+                        SendSetPred( succIP, nodeID, m_mainAddress);
+                }
         }else if( prdID > nodeID && prdID < successor ){
                 successor = prdID;
                 succIP = prdIP;
         }
         //Send a notify message to predecessor
 
+        SendNotify(prdIP, nodeID, m_mainAddress);
+
+}
+
+void
+GUChord::ProcessSetPred(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
+        //std::cout<<"SetPredRecieved"<<std::endl;
+        
+        predecessor = message.GetSetPred().newPredID;
+        predIP = message.GetSetPred().newPredIP;
+
+        //std::cout<<"New predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
+
+}
+
+void
+GUChord::ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
+
+        std::string messageNodeID = message.GetNotify().potentialPredID;
+        Ipv4Address messageNodeIP = message.GetNotify().potentialPredIP;
+
+        //std::cout<<"PotentialPredID: " << messageNodeID << std::endl;
+        //std::cout<<"PotentialPredIP: " << messageNodeIP << std::endl;
+
+        if( predecessor == "" || messageNodeID > predecessor ){
+                predecessor = messageNodeID;                
+                predIP = messageNodeIP;
+        }
 }
 
 void
 GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
+        Ipv4Address predecessorIP = message.GetChordLeave().predecessorAddress;
+        Ipv4Address successorIP = message.GetChordLeave().successorAddress;
+        std::string predecessorID = message.GetChordLeave().predecessorID;
+        std::string successorID = message.GetChordLeave().successorID;
+
+        
+
+        if( m_mainAddress == successorIP ){
+                std::cout<<"Successor notified of leave.  New Pred ID: "<<predecessorID<<std::endl;
+                predecessor = predecessorID;
+                predIP = predecessorIP;
+        }else if( m_mainAddress == predecessorIP ){
+                std::cout<<"Predecessor notified of leave. New Succ ID: "<<successorID<<std::endl;
+                successor = successorID;
+                succIP = successorIP;
+        }
 }
 
 
