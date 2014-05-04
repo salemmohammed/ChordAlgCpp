@@ -42,7 +42,9 @@ class GUChordMessage : public Header
         RING_STATE = 5,
         STABLE_REQ = 6,
         STABLE_RSP = 7,
-        CHORD_LEAVE = 8,    
+        SET_PRED = 8,
+        NOTIFY = 9,
+        CHORD_LEAVE = 10,    
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -143,10 +145,6 @@ class GUChordMessage : public Header
         uint32_t GetSerializedSize (void) const;
         void Serialize (Buffer::Iterator &start) const;
         uint32_t Deserialize (Buffer::Iterator &start);
-        // Payload
-        std::string requesterID;
-        Ipv4Address predecessorAddress;
-        Ipv4Address successorAddress;
       };
     struct StableRsp
       {
@@ -155,9 +153,8 @@ class GUChordMessage : public Header
         void Serialize (Buffer::Iterator &start) const;
         uint32_t Deserialize (Buffer::Iterator &start);
         //Payload
-        Ipv4Address predecessorAddress;
-        Ipv4Address successorAddress;
-        bool is_stable;
+        std::string predID;
+        Ipv4Address predAddress;
       };
     struct ChordLeave
       {
@@ -221,16 +218,14 @@ class GUChordMessage : public Header
     RingState GetRingState ();
         
     void SetRingState (std::string origin);
-
-    //Get & Set for Stable Request and Response
    
     StableReq GetStableReq ();
 
-    void SetStableReq (std::string rqID, Ipv4Address predecessorAddr, Ipv4Address successorAddr);
+    void SetStableReq ();
 
     StableRsp GetStableRsp ();
 
-    void SetStableRsp (Ipv4Address pred, Ipv4Address succ, bool status);
+    void SetStableRsp (std::string predId, Ipv4Address predIp);
 
     ChordLeave GetChordLeave ();
         

@@ -89,6 +89,7 @@ GUChord::StartApplication (void)
    
    m_mainAddress = GetMainInterface();
    nodeID = getNodeID(m_mainAddress);
+   predecessor = "";
   // Configure timers
   m_auditPingsTimer.SetFunction (&GUChord::AuditPings, this);
   m_sendStableTimer.SetFunction (&GUChord::startSendingStableReq, this);
@@ -163,7 +164,7 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
         SendRingStateMessage(succIP, nodeID);
   }else if (command == "STABILIZE"){
         
-                SendStableReq(succIP, nodeID);
+                SendStableReq(succIP);
         
   }
 
@@ -251,7 +252,6 @@ GUChord::SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Ad
 
 if (destAddress != Ipv4Address::GetAny ())
     {
-      std::cout<<"Sent message"<<std::endl;
 
       uint32_t transactionId = GetNextTransactionId ();
       CHORD_LOG ("Sending CHORD_JOIN to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
@@ -317,7 +317,7 @@ GUChord::SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID){
 }
 
 void
-GUChord::SendStableReq(Ipv4Address destAddress, std::string reqID){
+GUChord::SendStableReq(Ipv4Address destAddress){
 
   if (destAddress != Ipv4Address::GetAny ())
     {
@@ -328,20 +328,38 @@ GUChord::SendStableReq(Ipv4Address destAddress, std::string reqID){
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::STABLE_REQ, transactionId);
       
-      message.SetStableReq (reqID, predIP, succIP);
+      message.SetStableReq ();
       packet->AddHeader (message);
       m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
     }
   else
     {
       // Report failure   
-      std::cout<<"JOIN RESPONSE FAILED" <<std::endl;
+      std::cout<<"STABLE REQ FAILED" <<std::endl;
     }
 }
 
 void
-GUChord::SendStableRsp(Ipv4Address destAddress){
+GUChord::SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4Address predecessorIp){
 
+        if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending STABLE_RSP to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::STABLE_RSP, transactionId);
+      
+      message.SetStableRsp (predecessorId, predecessorIp);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"STABLE RSP FAILED" <<std::endl;
+    }
 
 
 
@@ -442,17 +460,28 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
         
         if( messageNodeID < successor || successor < nodeID){
                 
-                
                 if( successor < nodeID && messageNodeID < nodeID ){
                         SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
-                }else{
+                }/*//Code has not been tested
+                 else if( succIP == landmarkIP ){
+                        if( messageNodeID > successor ){
+                                SendJoinResponse(originAddress, succIP, successor);
+                                succIP = originAddress;
+                                successor = messageNodeID;                        
+                        
+                        }else if( messageNodeID < successor ){
+                                SendJoinResponse(succIP, originAddress, messageNodeID);
+                                SendJoinResponse(originAddress, landmarkSuccIP, landmarkSuccID);
+                        }
+                }*/else{
                         SendJoinResponse(originAddress, succIP, successor);
                         succIP = originAddress;
                         successor = messageNodeID;
                 }      
                 
         }else if( messageNodeID > successor ){
-
+                
+                //check if landmark, if it is then pass succ of landmark in message
                 SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
 
         }else if( successor == nodeID ){
@@ -494,11 +523,32 @@ GUChord::PrintRingState(GUChordMessage message, Ipv4Address sourceAddress, uint1
 void
 GUChord::ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
+        
+        if( sourceAddress != m_mainAddress ){    
+                
+                if( predecessor == "" )
+                        SendStableRsp(sourceAddress, nodeID, m_mainAddress);
+                else
+                        SendStableRsp(sourceAddress, predecessor, predIP);
+
+        }
+
 }
 
 void
 GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
+        std::string prdID = message.GetStableRsp().predID;
+        Ipv4Address prdIP = message.GetStableRsp().predAddress;
+
+        if( prdID == successor || prdIP == succIP ){
+                std::cout<<"Successor's predecessor not set"<<std::endl;
+                //successor's predecessor not set, so send a set predecessor message
+        }else if( prdID > nodeID && prdID < successor ){
+                successor = prdID;
+                succIP = prdIP;
+        }
+        //Send a notify message to predecessor
 
 }
 

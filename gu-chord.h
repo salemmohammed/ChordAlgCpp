@@ -52,8 +52,8 @@ class GUChord : public GUApplication
     void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
-    void SendStableReq(Ipv4Address destAddress, std::string reqID);
-    void SendStableRsp(Ipv4Address destAddress);
+    void SendStableReq(Ipv4Address destAddress);
+    void SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4Address predecessorIp);
     void SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred);
     void SetSelfToLandmark();                         //Set landmark boolean to true; initialize pred, succ, when command is called
     void FindSuccessor();

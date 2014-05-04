@@ -525,43 +525,28 @@ uint32_t
 GUChordMessage::StableReq::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length();
+  size = sizeof(uint16_t);
   return size;
 }
 void
 GUChordMessage::StableReq::Print (std::ostream &os) const
 {
-  os << "ChordJoin::requesterID: " << requesterID << "\n";
+  os << "StabilizeReq \n";
 }
 void
 GUChordMessage::StableReq::Serialize (Buffer::Iterator &start) const
 {
-  start.WriteU16 (requesterID.length ());
-  start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
-  
-  start.WriteHtonU32 (successorAddress.Get ());
-  start.WriteHtonU32 (predecessorAddress.Get ());
         
 }
 uint32_t
 GUChordMessage::StableReq::Deserialize (Buffer::Iterator &start)
 {
 
-  uint16_t length = start.ReadU16 ();
-  char* str = (char*) malloc (length);
-  start.Read ((uint8_t*)str, length);
-  requesterID = std::string (str, length);
-  free (str);
-
-  successorAddress = Ipv4Address (start.ReadNtohU32 ());
-  predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
-
   return StableReq::GetSerializedSize ();
-
 
 }
 void
-GUChordMessage::SetStableReq ( std::string rqID, Ipv4Address predecessorAddr, Ipv4Address successorAddr )
+GUChordMessage::SetStableReq ()
 {
    if (m_messageType == 0)
       {
@@ -571,9 +556,6 @@ GUChordMessage::SetStableReq ( std::string rqID, Ipv4Address predecessorAddr, Ip
       {
         NS_ASSERT (m_messageType == STABLE_REQ);
       }
-        m_message.stableMessage.requesterID = rqID;
-        m_message.stableMessage.successorAddress = successorAddr;
-        m_message.stableMessage.predecessorAddress = predecessorAddr;
 }
 
 GUChordMessage::StableReq
@@ -584,36 +566,44 @@ GUChordMessage::GetStableReq ()
 
 /************************       STABILIZE RESPONSE METHODS                  ******************************/
 
-
+//std::string predID; Ipv4Address predAddress;
 uint32_t
 GUChordMessage::StableRsp::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + sizeof(uint8_t);
+  size = (IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + predID.length();
   return size;
 }
 void
 GUChordMessage::StableRsp::Print (std::ostream &os) const
 {
-  os << "StableRsp::pred: "<< predecessorAddress <<" status: " << is_stable <<"\n";
+  os << "StableRsp::pred: "<< predAddress << "\n";
 }
 void
 GUChordMessage::StableRsp::Serialize (Buffer::Iterator &start) const
 {
-        start.WriteHtonU32 (successorAddress.Get ());
-        start.WriteHtonU32 (predecessorAddress.Get ());
-        start.WriteU8 (is_stable);
+
+        start.WriteU16 (predID.length ());
+        start.Write ((uint8_t *) (const_cast<char*> (predID.c_str())), predID.length());
+
+        start.WriteHtonU32 (predAddress.Get ());
 }
 uint32_t
 GUChordMessage::StableRsp::Deserialize (Buffer::Iterator &start)
 {
-  successorAddress = Ipv4Address (start.ReadNtohU32 ());
-  predecessorAddress = Ipv4Address (start.ReadNtohU32 ());
-  is_stable = start.ReadU8 ();
-  return StableRsp::GetSerializedSize ();
+
+        uint16_t length = start.ReadU16 ();
+        char* str = (char*) malloc (length);
+        start.Read ((uint8_t*)str, length);
+        predID = std::string (str, length);
+        free (str);
+
+        predAddress = Ipv4Address (start.ReadNtohU32 ());
+
+        return StableRsp::GetSerializedSize ();
 }
 void
-GUChordMessage::SetStableRsp ( Ipv4Address pred, Ipv4Address succ, bool status )
+GUChordMessage::SetStableRsp (std::string predId, Ipv4Address predIp)
 {
    if (m_messageType == 0)
       {
@@ -623,9 +613,8 @@ GUChordMessage::SetStableRsp ( Ipv4Address pred, Ipv4Address succ, bool status )
       {
         NS_ASSERT (m_messageType == STABLE_RSP);
       }
-        m_message.stableResponse.successorAddress = succ;
-        m_message.stableResponse.predecessorAddress = pred;
-        m_message.stableResponse.is_stable = status;
+        m_message.stableResponse.predID = predId;
+        m_message.stableResponse.predAddress = predIp;
 }
 
 GUChordMessage::StableRsp
