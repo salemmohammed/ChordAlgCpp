@@ -47,7 +47,7 @@ GUChord::GetTypeId ()
                    MakeTimeChecker ())
     .AddAttribute ("SendStableMessageTimeout",
                  "Timeout value for STABLE_REQ in milliseconds",
-                 TimeValue (MilliSeconds (20000)),
+                 TimeValue (MilliSeconds (2000)),
                  MakeTimeAccessor (&GUChord::m_sendStableTimeout),
                  MakeTimeChecker ())
     ;
@@ -121,9 +121,9 @@ GUChord::StopApplication (void)
 void 
 GUChord::startSendingStableReq(){
 
-        SendStableReq(succIP);
+        //SendStableReq(succIP);
 
-        m_sendStableTimer.Schedule (m_sendStableTimeout);
+        //m_sendStableTimer.Schedule (m_sendStableTimeout);
 
 }
 void
@@ -156,11 +156,12 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
       if( thisNodeNum == str ){
                 SetSelfToLandmark();
       }else{
-                SendJoinRequest(ResolveNodeIpAddress(str), m_mainAddress, ResolveNodeIpAddress(str), nodeID);
+                Ipv4Address lndmrkIP = ResolveNodeIpAddress(str);
+                std::string lndmrkID = "notset";                
+                SendJoinRequest(lndmrkIP, m_mainAddress, nodeID, lndmrkIP, lndmrkID);
       }
   }else if (command == "LEAVE"){
 
-      
       //send leave requests to successor and predecessor
       SendLeaveRequest(succIP, succIP, predIP, successor, predecessor);    
       SendLeaveRequest(predIP, succIP, predIP, successor, predecessor);
@@ -242,14 +243,14 @@ GUChord::getNodeID( Ipv4Address addr ){
 //Set local node to be landmark node by changing boolean values and succ, predecessor
 void
 GUChord::SetSelfToLandmark(){
-
+        std::cout<<"Landmark: ID: "<< nodeID<< std::endl;
         successor = nodeID;
         succIP = m_mainAddress;
 } 
 
 //Send a Join Message to attempt to join a Chord Network
 void
-GUChord::SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId)
+GUChord::SendJoinRequest( Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId )
 {
 
 if (destAddress != Ipv4Address::GetAny ())
@@ -260,7 +261,7 @@ if (destAddress != Ipv4Address::GetAny ())
       
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_JOIN, transactionId);
-      message.SetChordJoin (nId, successor, succIP, srcAddress, landmarkAddress);
+      message.SetChordJoin ( srcId, landmarkId, srcAddress, landmarkAddress);
       packet->AddHeader (message);
       m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
     }
@@ -495,46 +496,101 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
 {
 
         std::string messageNodeID = message.GetChordJoin().requesterID;
+        std::string landmID = message.GetChordJoin().landmarkID;
         Ipv4Address originAddress = message.GetChordJoin().originatorAddress;
         Ipv4Address landmarkIP = message.GetChordJoin().landmarkAddress;
-        std::string landmarkID = getNodeID(landmarkIP);
+        
 
-        //std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
+        std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
         
-        
-        if( messageNodeID < successor || successor < nodeID){
-                
-                if( successor < nodeID && messageNodeID < nodeID ){
-                        SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
-                }/*//Code has not been tested
-                 else if( succIP == landmarkIP ){
-                        if( messageNodeID > successor ){
-                                SendJoinResponse(originAddress, succIP, successor);
-                                succIP = originAddress;
-                                successor = messageNodeID;                        
+
+        if( landmID == "notset" && m_mainAddress != succIP ){
+                std::cout<<"LMID NOT SET"<<std::endl;
+                //SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+
+                if( nodeID < successor && messageNodeID > successor ){
+                        //std::cout<<"non-wraparound case. pass node."<<std::endl;
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
                         
-                        }else if( messageNodeID < successor ){
-                                SendJoinResponse(succIP, originAddress, messageNodeID);
-                                SendJoinResponse(originAddress, landmarkSuccIP, landmarkSuccID);
-                        }
-                }*/else{
+                }else if( nodeID < successor && messageNodeID < successor ){
+                        
+                        //std::cout<<"non-wraparound case. place node."<<std::endl;
+                
                         SendJoinResponse(originAddress, succIP, successor);
+                        
                         succIP = originAddress;
                         successor = messageNodeID;
-                }      
-                
-        }else if( messageNodeID > successor ){
-                
-                //check if landmark, if it is then pass succ of landmark in message
-                SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
-
+                }else if( nodeID > successor && messageNodeID > successor ){
+                        //std::cout<<"wraparound case. pass node."<<std::endl;
+        
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+                }else{
+                        //std::cout<<"wraparound case. place node."<<
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                          
+                }
+                                                       
         }else if( successor == nodeID ){
 
                 SendJoinResponse(originAddress, m_mainAddress, nodeID);
                 
                 succIP = originAddress;
                 successor = messageNodeID;
-        }       
+
+        } else if( successor == landmID ){
+                
+                if( messageNodeID < successor && nodeID < successor ){
+                        
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+ 
+                } else if( messageNodeID > successor && nodeID < successor){
+
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }else if( messageNodeID > nodeID && nodeID > successor){
+
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                }else{
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }
+
+        } else if( successor != landmID ){
+                
+                if( nodeID < successor && messageNodeID > successor ){
+                        //std::cout<<"non-wraparound case. pass node."<<std::endl;
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                        
+                }else if( nodeID < successor && messageNodeID < successor ){
+                        
+                        //std::cout<<"non-wraparound case. place node."<<std::endl;
+                
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                }else if( nodeID > successor && messageNodeID > successor ){
+                        //std::cout<<"wraparound case. pass node."<<std::endl;
+        
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }else{
+                        //std::cout<<"wraparound case. place node."<<
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                          
+                }     
+
+        }
+           
 }
 void
 GUChord::ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort)
@@ -543,7 +599,7 @@ GUChord::ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress,
         succIP = message.GetChordJoinRsp().successorVal;
         successor = message.GetChordJoinRsp().newSucc;
 
-        std::cout<<"Changing successor of Node ID: "<< nodeID << " to: "<<succIP<<", Node ID: " << successor << std::endl;
+        std::cout<<"Changing successor of Node ID: "<< nodeID << " to: "<< succIP <<", Node ID: " << successor << std::endl;
 
 }
 
@@ -587,15 +643,14 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
         std::string prdID = message.GetStableRsp().predID;
         Ipv4Address prdIP = message.GetStableRsp().predAddress;
 
-        
-
-        if( prdID == successor || prdIP == succIP ){
+        if( prdID == successor ){
                 //successor's predecessor not set, so send a set predecessor message to successor
-                if( succIP != m_mainAddress ){
-                        //std::cout<<"StableMessageRecieved"<<std::endl;
+                //if( succIP != m_mainAddress ){
+                        std::cout<<"StableMessageRecieved"<<std::endl;
                         SendSetPred( succIP, nodeID, m_mainAddress);
-                }
-        }else if( prdID > nodeID && prdID < successor ){
+                //}
+        }
+        if( prdID > nodeID && prdID < successor ){
                 successor = prdID;
                 succIP = prdIP;
         }
@@ -622,8 +677,8 @@ GUChord::ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16
         std::string messageNodeID = message.GetNotify().potentialPredID;
         Ipv4Address messageNodeIP = message.GetNotify().potentialPredIP;
 
-        //std::cout<<"PotentialPredID: " << messageNodeID << std::endl;
-        //std::cout<<"PotentialPredIP: " << messageNodeIP << std::endl;
+        std::cout<<"PotentialPredID: " << messageNodeID << std::endl;
+        std::cout<<"PotentialPredIP: " << messageNodeIP << std::endl;
 
         if( predecessor == "" || messageNodeID > predecessor ){
                 predecessor = messageNodeID;                

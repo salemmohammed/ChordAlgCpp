@@ -354,7 +354,7 @@ uint32_t
 GUChordMessage::ChordJoin::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (3*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length() + landmarkSuccessor.length();
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length() + landmarkID.length();
   return 10*size;
 }
 void
@@ -368,12 +368,12 @@ GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
   start.WriteU16 (requesterID.length ());
   start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
 
-  start.WriteU16 (landmarkSuccessor.length ());
-  start.Write ((uint8_t *) (const_cast<char*> (landmarkSuccessor.c_str())), landmarkSuccessor.length());
+  start.WriteU16 (landmarkID.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (landmarkID.c_str())), landmarkID.length());
 
-  start.WriteHtonU32 (landmarkSuccIP.Get ());
   start.WriteHtonU32 (originatorAddress.Get ());
   start.WriteHtonU32 (landmarkAddress.Get ());
+  
         
 }
 uint32_t
@@ -389,10 +389,9 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
   uint16_t length2 = start.ReadU16 ();
   char* str2 = (char*) malloc (length2);
   start.Read ((uint8_t*)str2, length2);
-  landmarkSuccessor = std::string (str2, length2);
+  landmarkID = std::string (str2, length2);
   free (str2);
 
-  landmarkSuccIP = Ipv4Address (start.ReadNtohU32 ());
   originatorAddress = Ipv4Address (start.ReadNtohU32 ());
   landmarkAddress = Ipv4Address (start.ReadNtohU32 ());
 
@@ -401,7 +400,7 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
 
 }
 void
-GUChordMessage::SetChordJoin ( std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr )
+GUChordMessage::SetChordJoin ( std::string rqID, std::string lmID, Ipv4Address originAddr, Ipv4Address landmarkAddr )
 {
    if (m_messageType == 0)
       {
@@ -412,8 +411,7 @@ GUChordMessage::SetChordJoin ( std::string rqID, std::string landmarkSucc, Ipv4A
         NS_ASSERT (m_messageType == CHORD_JOIN);
       }
         m_message.joinMessage.requesterID = rqID;
-        m_message.joinMessage.landmarkSuccessor = landmarkSucc;
-        m_message.joinMessage.landmarkSuccIP = lmSuccIP;
+        m_message.joinMessage.landmarkID = lmID;
         m_message.joinMessage.originatorAddress = originAddr;
         m_message.joinMessage.landmarkAddress = landmarkAddr;
 }
