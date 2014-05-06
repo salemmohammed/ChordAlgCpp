@@ -121,9 +121,9 @@ GUChord::StopApplication (void)
 void 
 GUChord::startSendingStableReq(){
 
-        //SendStableReq(succIP);
+        SendStableReq(succIP);
 
-        //m_sendStableTimer.Schedule (m_sendStableTimeout);
+        m_sendStableTimer.Schedule (m_sendStableTimeout);
 
 }
 void
@@ -646,28 +646,36 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
         if( prdID == successor ){
                 //successor's predecessor not set, so send a set predecessor message to successor
                 //if( succIP != m_mainAddress ){
-                        std::cout<<"StableMessageRecieved"<<std::endl;
+                        //std::cout<<"StableMessageRecieved"<<std::endl;
                         SendSetPred( succIP, nodeID, m_mainAddress);
                 //}
         }
-        if( prdID > nodeID && prdID < successor ){
+        /*if( (prdID > nodeID && prdID < successor) || (nodeID > successor && prdID < nodeID && prdID < successor) ){
+                
                 successor = prdID;
                 succIP = prdIP;
-        }
+                //std::cout<<"Changing successor of NODE ID: "<<nodeID<<"\nto: "<<successor;
+        }*/
         //Send a notify message to predecessor
 
-        SendNotify(prdIP, nodeID, m_mainAddress);
+        //std::cout<<"Sending notify to: "<<prdIP <<std::endl;
+        //SendNotify(prdIP, nodeID, m_mainAddress);
 
 }
 
 void
 GUChord::ProcessSetPred(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
         //std::cout<<"SetPredRecieved"<<std::endl;
-        
-        predecessor = message.GetSetPred().newPredID;
-        predIP = message.GetSetPred().newPredIP;
 
-        //std::cout<<"New predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
+        std::string setPredID = message.GetSetPred().newPredID;
+        Ipv4Address setPredIP = message.GetSetPred().newPredIP;
+        
+        if( predecessor == "" || (predecessor < nodeID && setPredID > predecessor) || (predecessor > nodeID && ( setPredID > predecessor || setPredID < nodeID )) ){
+                        
+                predecessor = setPredID;
+                predIP = setPredIP;
+        }
+        //std::cout<<"Node ID: "<<nodeID<<"\nNew predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
 
 }
 
@@ -676,11 +684,10 @@ GUChord::ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16
 
         std::string messageNodeID = message.GetNotify().potentialPredID;
         Ipv4Address messageNodeIP = message.GetNotify().potentialPredIP;
-
-        std::cout<<"PotentialPredID: " << messageNodeID << std::endl;
-        std::cout<<"PotentialPredIP: " << messageNodeIP << std::endl;
-
-        if( predecessor == "" || messageNodeID > predecessor ){
+        //std::string successor
+        
+        if( predecessor == "" || messageNodeID > predecessor || (nodeID > successor && messageNodeID < predecessor )){
+                //std::cout<<"Predecessor for node: "<<nodeID<<" changed to "<<messageNodeID<<std::endl;
                 predecessor = messageNodeID;                
                 predIP = messageNodeIP;
         }
