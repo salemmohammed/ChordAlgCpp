@@ -116,10 +116,10 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         // Payload
         std::string requesterID;
-        std::string landmarkID;
+        std::string landmarkSuccessor;
+        Ipv4Address landmarkSuccIP;
         Ipv4Address originatorAddress;
         Ipv4Address landmarkAddress;
-        
       };
     struct ChordJoinRsp
       {
@@ -234,7 +234,7 @@ class GUChordMessage : public Header
     
     ChordJoin GetChordJoin ();
    
-    void SetChordJoin (std::string rqID, std::string lmID, Ipv4Address originAddr, Ipv4Address landmarkAddr);
+    void SetChordJoin (std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr);
 
     ChordJoinRsp GetChordJoinRsp ();
     

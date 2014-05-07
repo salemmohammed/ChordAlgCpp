@@ -50,7 +50,7 @@ class GUChord : public GUApplication
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr);              //Compute Hash Value
 
-    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId);    //Method to send out join message to landmark node
+    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
     void startSendingStableReq();
@@ -114,6 +114,8 @@ class GUChord : public GUApplication
     std::string successor;      //next node
     std::string predecessor;    //previous node
     std::string nodeID;      //Computed ID
+    bool is_last;
+    bool is_landmark;
 };
 
 #endif
