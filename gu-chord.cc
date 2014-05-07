@@ -23,9 +23,12 @@
 #include "ns3/inet-socket-address.h"
 #include <openssl/sha.h>
 #include <stdio.h>
+#include <math.h>
 #include <string>
 #include <sstream>
 #include <iostream>
+
+#define M_VALUE 3
 
 using namespace ns3;
 
@@ -47,7 +50,7 @@ GUChord::GetTypeId ()
                    MakeTimeChecker ())
     .AddAttribute ("SendStableMessageTimeout",
                  "Timeout value for STABLE_REQ in milliseconds",
-                 TimeValue (MilliSeconds (20000)),
+                 TimeValue (MilliSeconds (2000)),
                  MakeTimeAccessor (&GUChord::m_sendStableTimeout),
                  MakeTimeChecker ())
     ;
@@ -87,10 +90,15 @@ GUChord::StartApplication (void)
       m_socket->SetRecvCallback (MakeCallback (&GUChord::RecvMessage, this));
     }
 
-   
+    
    m_mainAddress = GetMainInterface();
    nodeID = getNodeID(m_mainAddress);
    predecessor = "";
+
+   for( int i = M_VALUE-1; i >= 0; i-- ){
+        std::string output = getFingerBound(m_mainAddress, i);
+        fingerTestVals.push_back( output );
+   }
   // Configure timers
   m_auditPingsTimer.SetFunction (&GUChord::AuditPings, this);
   m_sendStableTimer.SetFunction (&GUChord::startSendingStableReq, this);
@@ -156,11 +164,12 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
       if( thisNodeNum == str ){
                 SetSelfToLandmark();
       }else{
-                SendJoinRequest(ResolveNodeIpAddress(str), m_mainAddress, ResolveNodeIpAddress(str), nodeID);
+                Ipv4Address lndmrkIP = ResolveNodeIpAddress(str);
+                std::string lndmrkID = "notset";                
+                SendJoinRequest(lndmrkIP, m_mainAddress, nodeID, lndmrkIP, lndmrkID);
       }
   }else if (command == "LEAVE"){
 
-      
       //send leave requests to successor and predecessor
       SendLeaveRequest(succIP, succIP, predIP, successor, predecessor);    
       SendLeaveRequest(predIP, succIP, predIP, successor, predecessor);
@@ -202,28 +211,15 @@ std::string
 GUChord::getNodeID( Ipv4Address addr ){
 
         uint8_t seperateBytes[5];
-        char value1[32], value2[32], value3[32], value4[32];
-        char period[2];
-        period[0] = '.';
-        char buffer[256];
+        char value[32];
         
         addr.Serialize(seperateBytes);
-
-        sprintf(value1, "%d", seperateBytes[0]);
-        sprintf(value2, "%d", seperateBytes[1]);
-        sprintf(value3, "%d", seperateBytes[2]);
-        sprintf(value4, "%d", seperateBytes[3]);
-
-        strncpy(buffer, value1, sizeof(buffer));
-        strncat(buffer, period, sizeof(buffer));
-        strncat(buffer, value2, sizeof(buffer));
-        strncat(buffer, period, sizeof(buffer));
-        strncat(buffer, value3, sizeof(buffer));
-        strncat(buffer, period, sizeof(buffer));
-        strncat(buffer, value4, sizeof(buffer));
+        uint32_t totalVal = seperateBytes[0] + seperateBytes[1] + seperateBytes[2] + seperateBytes[3];
+        
+        sprintf(value, "%d", totalVal);
         
         unsigned char digest[SHA_DIGEST_LENGTH];
-        std::string input = (std::string)buffer;
+        std::string input = (std::string)value;
          
         SHA_CTX ctx;
         SHA1_Init(&ctx);
@@ -234,22 +230,49 @@ GUChord::getNodeID( Ipv4Address addr ){
         for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
             sprintf(&mdString[i*2], "%02x", (unsigned int)digest[i]);
         
-        printf("%s\n", mdString);
-
         return (std::string)mdString;
+}
+
+std::string
+GUChord::getFingerBound( Ipv4Address addr, uint32_t i ){
+
+        uint8_t seperateBytes[5];
+        char value[32];
+        
+        addr.Serialize(seperateBytes);
+        uint32_t totalVal = seperateBytes[0] + seperateBytes[1] + seperateBytes[2] + seperateBytes[3];
+        uint32_t extra = (uint32_t) ((int)pow(2, (double)i) % ((int)pow(2, (double)M_VALUE))); 
+        totalVal = totalVal + extra;
+        sprintf(value, "%d", totalVal);
+        
+        unsigned char digest[SHA_DIGEST_LENGTH];
+        std::string input = (std::string)value;
+         
+        SHA_CTX ctx;
+        SHA1_Init(&ctx);
+        SHA1_Update(&ctx, (unsigned char*)input.c_str(), input.size());
+        SHA1_Final(digest, &ctx);
+         
+        char mdString[SHA_DIGEST_LENGTH*2+1];
+        for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+            sprintf(&mdString[i*2], "%02x", (unsigned int)digest[i]);
+        
+        
+        return (std::string)mdString;
+        
 }
 
 //Set local node to be landmark node by changing boolean values and succ, predecessor
 void
 GUChord::SetSelfToLandmark(){
-
+        std::cout<<"Landmark: ID: "<< nodeID<< std::endl;
         successor = nodeID;
         succIP = m_mainAddress;
 } 
 
 //Send a Join Message to attempt to join a Chord Network
 void
-GUChord::SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId)
+GUChord::SendJoinRequest( Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId )
 {
 
 if (destAddress != Ipv4Address::GetAny ())
@@ -260,7 +283,7 @@ if (destAddress != Ipv4Address::GetAny ())
       
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_JOIN, transactionId);
-      message.SetChordJoin (nId, successor, succIP, srcAddress, landmarkAddress);
+      message.SetChordJoin ( srcId, landmarkId, srcAddress, landmarkAddress);
       packet->AddHeader (message);
       m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
     }
@@ -442,6 +465,53 @@ if (destAddress != Ipv4Address::GetAny ())
 }
 
 void
+GUChord::SendFingerReq(Ipv4Address destAddress, std::vector<std::string> testIds, std::vector<std::string> fingerEntries, std::vector<Ipv4Address> fingerIP, Ipv4Address originator){
+
+        if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending FINGER_REQ to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::FINGERME_REQ, transactionId);
+      
+      message.SetFingerReq (testIds, fingerEntries, fingerIP, originator);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"FINGER REQUEST FAILED" <<std::endl;
+    }
+
+}
+void
+GUChord::SendFingerRsp(Ipv4Address destAddress, std::vector<std::string> fingerNum, std::vector<Ipv4Address> fingerAddr){
+
+        if (destAddress != Ipv4Address::GetAny ())
+    {
+      uint32_t transactionId = GetNextTransactionId ();
+      CHORD_LOG ("Sending FINGER RSP to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId);
+      
+      
+      Ptr<Packet> packet = Create<Packet> ();
+      GUChordMessage message = GUChordMessage (GUChordMessage::FINGERME_RSP, transactionId);
+      
+      message.SetFingerRsp (fingerNum, fingerAddr);
+      packet->AddHeader (message);
+      m_socket->SendTo (packet, 0 , InetSocketAddress (destAddress, m_appPort));
+    }
+  else
+    {
+      // Report failure   
+      std::cout<<"FINGER RESPONSE FAILED" <<std::endl;
+    }
+
+}
+
+void
 GUChord::RecvMessage (Ptr<Socket> socket)
 {
   Address sourceAddr;
@@ -484,6 +554,12 @@ GUChord::RecvMessage (Ptr<Socket> socket)
       case GUChordMessage::CHORD_LEAVE:
         ProcessChordLeave(message, sourceAddress, sourcePort);
         break;
+      case GUChordMessage::FINGERME_REQ:
+        ProcessFingerReq(message, sourceAddress, sourcePort);
+        break;
+      case GUChordMessage::FINGERME_RSP:
+        ProcessFingerRsp(message, sourceAddress, sourcePort);
+        break;
       default:
         ERROR_LOG ("Unknown Message Type!");
         break;
@@ -495,46 +571,99 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
 {
 
         std::string messageNodeID = message.GetChordJoin().requesterID;
+        std::string landmID = message.GetChordJoin().landmarkID;
         Ipv4Address originAddress = message.GetChordJoin().originatorAddress;
         Ipv4Address landmarkIP = message.GetChordJoin().landmarkAddress;
-        std::string landmarkID = getNodeID(landmarkIP);
+ 
+        std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
+        
 
-        //std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
-        
-        
-        if( messageNodeID < successor || successor < nodeID){
-                
-                if( successor < nodeID && messageNodeID < nodeID ){
-                        SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
-                }/*//Code has not been tested
-                 else if( succIP == landmarkIP ){
-                        if( messageNodeID > successor ){
-                                SendJoinResponse(originAddress, succIP, successor);
-                                succIP = originAddress;
-                                successor = messageNodeID;                        
+        if( landmID == "notset" && m_mainAddress != succIP ){
+                std::cout<<"LMID NOT SET"<<std::endl;
+                //SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+
+                if( nodeID < successor && messageNodeID > successor ){
+                        //std::cout<<"non-wraparound case. pass node."<<std::endl;
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
                         
-                        }else if( messageNodeID < successor ){
-                                SendJoinResponse(succIP, originAddress, messageNodeID);
-                                SendJoinResponse(originAddress, landmarkSuccIP, landmarkSuccID);
-                        }
-                }*/else{
+                }else if( nodeID < successor && messageNodeID < successor ){
+                        
+                        //std::cout<<"non-wraparound case. place node."<<std::endl;
+                
                         SendJoinResponse(originAddress, succIP, successor);
+                        
                         succIP = originAddress;
                         successor = messageNodeID;
-                }      
-                
-        }else if( messageNodeID > successor ){
-                
-                //check if landmark, if it is then pass succ of landmark in message
-                SendJoinRequest(succIP, originAddress, landmarkIP, messageNodeID);
-
+                }else if( nodeID > successor && messageNodeID > successor ){
+                        //std::cout<<"wraparound case. pass node."<<std::endl;
+        
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+                }else{
+                        //std::cout<<"wraparound case. place node."<<
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                }
+                                                       
         }else if( successor == nodeID ){
 
                 SendJoinResponse(originAddress, m_mainAddress, nodeID);
                 
                 succIP = originAddress;
                 successor = messageNodeID;
-        }       
+
+        } else if( successor == landmID ){
+                
+                if( messageNodeID < successor && nodeID < successor ){
+                        
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+ 
+                } else if( messageNodeID > successor && nodeID < successor){
+
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }else if( messageNodeID > nodeID && nodeID > successor){
+
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                }else{
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }
+
+        } else if( successor != landmID ){
+                
+                if( nodeID < successor && messageNodeID > successor ){
+                        //std::cout<<"non-wraparound case. pass node."<<std::endl;
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                        
+                }else if( nodeID < successor && messageNodeID < successor ){
+                        
+                        //std::cout<<"non-wraparound case. place node."<<std::endl;
+                
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                }else if( nodeID > successor && messageNodeID > successor ){
+                        //std::cout<<"wraparound case. pass node."<<std::endl;
+        
+                        SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
+                }else{
+                        //std::cout<<"wraparound case. place node."<<
+                        SendJoinResponse(originAddress, succIP, successor);
+                        
+                        succIP = originAddress;
+                        successor = messageNodeID;
+                          
+                }     
+
+        }
+           
 }
 void
 GUChord::ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort)
@@ -543,7 +672,12 @@ GUChord::ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress,
         succIP = message.GetChordJoinRsp().successorVal;
         successor = message.GetChordJoinRsp().newSucc;
 
-        std::cout<<"Changing successor of Node ID: "<< nodeID << " to: "<<succIP<<", Node ID: " << successor << std::endl;
+        std::vector<std::string> fentry;
+        std::vector<Ipv4Address> faddress;
+
+        SendFingerReq(succIP, fingerTestVals, fentry, faddress, m_mainAddress);
+        
+        std::cout<<"Changing successor of Node ID: "<< nodeID << " to: "<< succIP <<", Node ID: " << successor << std::endl;
 
 }
 
@@ -587,32 +721,39 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
         std::string prdID = message.GetStableRsp().predID;
         Ipv4Address prdIP = message.GetStableRsp().predAddress;
 
-        
-
-        if( prdID == successor || prdIP == succIP ){
+        if( prdID == successor ){
                 //successor's predecessor not set, so send a set predecessor message to successor
-                if( succIP != m_mainAddress ){
+                //if( succIP != m_mainAddress ){
                         //std::cout<<"StableMessageRecieved"<<std::endl;
                         SendSetPred( succIP, nodeID, m_mainAddress);
-                }
-        }else if( prdID > nodeID && prdID < successor ){
+                //}
+        }
+        /*if( (prdID > nodeID && prdID < successor) || (nodeID > successor && prdID < nodeID && prdID < successor) ){
+                
                 successor = prdID;
                 succIP = prdIP;
-        }
+                //std::cout<<"Changing successor of NODE ID: "<<nodeID<<"\nto: "<<successor;
+        }*/
         //Send a notify message to predecessor
 
-        SendNotify(prdIP, nodeID, m_mainAddress);
+        //std::cout<<"Sending notify to: "<<prdIP <<std::endl;
+        //SendNotify(prdIP, nodeID, m_mainAddress);
 
 }
 
 void
 GUChord::ProcessSetPred(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
         //std::cout<<"SetPredRecieved"<<std::endl;
-        
-        predecessor = message.GetSetPred().newPredID;
-        predIP = message.GetSetPred().newPredIP;
 
-        //std::cout<<"New predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
+        std::string setPredID = message.GetSetPred().newPredID;
+        Ipv4Address setPredIP = message.GetSetPred().newPredIP;
+        
+        if( predecessor == "" || (predecessor < nodeID && setPredID > predecessor) || (predecessor > nodeID && ( setPredID > predecessor || setPredID < nodeID )) ){
+                        
+                predecessor = setPredID;
+                predIP = setPredIP;
+        }
+        //std::cout<<"Node ID: "<<nodeID<<"\nNew predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
 
 }
 
@@ -621,11 +762,10 @@ GUChord::ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16
 
         std::string messageNodeID = message.GetNotify().potentialPredID;
         Ipv4Address messageNodeIP = message.GetNotify().potentialPredIP;
-
-        //std::cout<<"PotentialPredID: " << messageNodeID << std::endl;
-        //std::cout<<"PotentialPredIP: " << messageNodeIP << std::endl;
-
-        if( predecessor == "" || messageNodeID > predecessor ){
+        //std::string successor
+        
+        if( predecessor == "" || messageNodeID > predecessor || (nodeID > successor && messageNodeID < predecessor )){
+                //std::cout<<"Predecessor for node: "<<nodeID<<" changed to "<<messageNodeID<<std::endl;
                 predecessor = messageNodeID;                
                 predIP = messageNodeIP;
         }
@@ -639,8 +779,6 @@ GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, u
         std::string predecessorID = message.GetChordLeave().predecessorID;
         std::string successorID = message.GetChordLeave().successorID;
 
-        
-
         if( m_mainAddress == successorIP ){
                 std::cout<<"Successor notified of leave.  New Pred ID: "<<predecessorID<<std::endl;
                 predecessor = predecessorID;
@@ -650,6 +788,62 @@ GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, u
                 successor = successorID;
                 succIP = successorIP;
         }
+}
+
+void
+GUChord::ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
+        //std::cout<<"Recieved Request."<<std::endl;
+        Ipv4Address origin = message.GetFingerReq().originatorNode;
+        std::vector<std::string> testIds = message.GetFingerReq().testIdentifiers;
+        std::vector<std::string> fingerIds = message.GetFingerReq().fingerEntries;
+        std::vector<Ipv4Address> fingerAddrs = message.GetFingerReq().fingerIps;
+        
+        std::cout <<"TestIDs Size: " <<testIds.size() <<std::endl;
+        if( succIP == origin ){
+                std::cout <<"succIP == origin" <<std::endl;
+                //SendFingerRsp(origin, fingerIds, fingerAddrs);
+        }else{
+                if( !testIds.empty() ){
+                        
+                        std::cout <<"testIDs not empty" <<std::endl;                                        
+                        std::string ithvalue = testIds[testIds.size()-1];
+
+                        if( nodeID < successor ){
+
+                                std::cout <<"nodeID < successor" <<std::endl;
+
+                                if( ithvalue <= successor && ithvalue > nodeID ){
+
+                                        std::cout << "ithvalue <= successor && ithvalue > nodeID" <<std::endl;
+                                        testIds.pop_back();
+                                        fingerIds.push_back(successor);
+                                        fingerAddrs.push_back(succIP);
+                                }
+
+                        }else if ( nodeID > successor ){
+
+                                if( ithvalue > nodeID || ithvalue == successor ){
+
+                                        std::cout <<"ithvalue > nodeID || ithvalue == successor" <<std::endl;
+                                        testIds.pop_back();
+                                        fingerIds.push_back(successor);
+                                        fingerAddrs.push_back(succIP);
+                                }                                
+                        }
+
+                        if( testIds.empty() ){
+                                SendFingerRsp(origin, fingerIds, fingerAddrs);
+                                std::cout<<"Sending Finger Response."<<std::endl;
+                        }else{
+                                std::cout <<"still not empty" <<std::endl;
+                                SendFingerReq(succIP, testIds, fingerIds, fingerAddrs, origin);
+                        }
+                }
+        }
+}
+void
+GUChord::ProcessFingerRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
+
 }
 
 

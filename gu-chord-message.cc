@@ -16,6 +16,7 @@
 
 #include "ns3/gu-chord-message.h"
 #include "ns3/log.h"
+#include <vector>
 
 using namespace ns3;
 
@@ -90,6 +91,12 @@ GUChordMessage::GetSerializedSize (void) const
       case CHORD_LEAVE:
         size += m_message.leaveMessage.GetSerializedSize ();
         break;
+      case FINGERME_REQ:
+        size += m_message.fingerReq.GetSerializedSize ();
+        break;
+      case FINGERME_RSP:
+        size += m_message.fingerRsp.GetSerializedSize ();
+        break;
       default:
         NS_ASSERT (false);
     }
@@ -136,6 +143,12 @@ GUChordMessage::Print (std::ostream &os) const
       case CHORD_LEAVE:
         m_message.leaveMessage.Print (os);
         break;
+      case FINGERME_REQ:
+        m_message.fingerReq.Print (os);
+        break;
+      case FINGERME_RSP:
+        m_message.fingerRsp.Print (os);
+        break;
       default:
         break;  
     }
@@ -180,6 +193,12 @@ GUChordMessage::Serialize (Buffer::Iterator start) const
         break;
       case CHORD_LEAVE:
         m_message.leaveMessage.Serialize (i);
+        break;
+      case FINGERME_REQ:
+        m_message.fingerReq.Serialize (i);
+        break;
+      case FINGERME_RSP:
+        m_message.fingerRsp.Serialize (i);
         break;
       default:
         NS_ASSERT (false);   
@@ -227,6 +246,12 @@ GUChordMessage::Deserialize (Buffer::Iterator start)
         break;
       case CHORD_LEAVE:
         size += m_message.leaveMessage.Deserialize (i);
+        break;
+      case FINGERME_REQ:
+        size += m_message.fingerReq.Deserialize (i);
+        break;
+      case FINGERME_RSP:
+        size += m_message.fingerRsp.Deserialize (i);
         break;
       default:
         NS_ASSERT (false);
@@ -354,7 +379,7 @@ uint32_t
 GUChordMessage::ChordJoin::GetSerializedSize (void) const
 {
   uint32_t size;
-  size = (3*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length() + landmarkSuccessor.length();
+  size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + requesterID.length() + landmarkID.length();
   return 10*size;
 }
 void
@@ -368,12 +393,12 @@ GUChordMessage::ChordJoin::Serialize (Buffer::Iterator &start) const
   start.WriteU16 (requesterID.length ());
   start.Write ((uint8_t *) (const_cast<char*> (requesterID.c_str())), requesterID.length());
 
-  start.WriteU16 (landmarkSuccessor.length ());
-  start.Write ((uint8_t *) (const_cast<char*> (landmarkSuccessor.c_str())), landmarkSuccessor.length());
+  start.WriteU16 (landmarkID.length ());
+  start.Write ((uint8_t *) (const_cast<char*> (landmarkID.c_str())), landmarkID.length());
 
-  start.WriteHtonU32 (landmarkSuccIP.Get ());
   start.WriteHtonU32 (originatorAddress.Get ());
   start.WriteHtonU32 (landmarkAddress.Get ());
+  
         
 }
 uint32_t
@@ -389,10 +414,9 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
   uint16_t length2 = start.ReadU16 ();
   char* str2 = (char*) malloc (length2);
   start.Read ((uint8_t*)str2, length2);
-  landmarkSuccessor = std::string (str2, length2);
+  landmarkID = std::string (str2, length2);
   free (str2);
 
-  landmarkSuccIP = Ipv4Address (start.ReadNtohU32 ());
   originatorAddress = Ipv4Address (start.ReadNtohU32 ());
   landmarkAddress = Ipv4Address (start.ReadNtohU32 ());
 
@@ -401,7 +425,7 @@ GUChordMessage::ChordJoin::Deserialize (Buffer::Iterator &start)
 
 }
 void
-GUChordMessage::SetChordJoin ( std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr )
+GUChordMessage::SetChordJoin ( std::string rqID, std::string lmID, Ipv4Address originAddr, Ipv4Address landmarkAddr )
 {
    if (m_messageType == 0)
       {
@@ -412,8 +436,7 @@ GUChordMessage::SetChordJoin ( std::string rqID, std::string landmarkSucc, Ipv4A
         NS_ASSERT (m_messageType == CHORD_JOIN);
       }
         m_message.joinMessage.requesterID = rqID;
-        m_message.joinMessage.landmarkSuccessor = landmarkSucc;
-        m_message.joinMessage.landmarkSuccIP = lmSuccIP;
+        m_message.joinMessage.landmarkID = lmID;
         m_message.joinMessage.originatorAddress = originAddr;
         m_message.joinMessage.landmarkAddress = landmarkAddr;
 }
@@ -647,7 +670,7 @@ GUChordMessage::GetStableRsp ()
 }
 
 
-/************************************      SET PRED METHODS           ********************************/
+/************************************      SET PRED METHODS         ***************************/
 
 uint32_t
 GUChordMessage::SetPred::GetSerializedSize (void) const
@@ -706,9 +729,8 @@ GUChordMessage::GetSetPred ()
 }
 
 
-/************************************      NOTIFY METHODS             ********************************/
+/************************************      NOTIFY METHODS             **************************/
 
-//std::string potentialPredID;   Ipv4Address potentialPredIP;
 uint32_t
 GUChordMessage::Notify::GetSerializedSize (void) const
 {
@@ -767,7 +789,7 @@ GUChordMessage::GetNotify ()
 
 
 
-/************************************      CHORD LEAVE METHODS        ********************************/
+/************************************      CHORD LEAVE METHODS      ****************************/
 
 uint32_t
 GUChordMessage::ChordLeave::GetSerializedSize (void) const
@@ -838,11 +860,202 @@ GUChordMessage::GetChordLeave ()
   return m_message.leaveMessage;
 }
 
+/********************************      FINGER REQ       **************************************/
+
+uint32_t
+GUChordMessage::FingerReq::GetSerializedSize (void) const
+{
+
+  uint32_t size;
+  size = sizeof(uint16_t) + (IPV4_ADDRESS_SIZE);
+  size += sizeof(uint32_t);
+
+  for (std::vector<std::string>::const_iterator it = testIdentifiers.begin(); it != testIdentifiers.end(); it++) {
+    size += sizeof(uint16_t);
+    size += (*it).length();
+  }
+
+  for (std::vector<std::string>::const_iterator it = fingerEntries.begin(); it != fingerEntries.end(); it++) {
+    size += sizeof(uint16_t);
+    size += (*it).length();
+  }
+  
+  for (std::vector<Ipv4Address>::const_iterator it = fingerIps.begin(); it != fingerIps.end(); it++) {
+    size += sizeof(uint16_t) + (IPV4_ADDRESS_SIZE);
+  }
+
+  return 10*size;
+}
+void
+GUChordMessage::FingerReq::Print (std::ostream &os) const
+{
+  os << "FingerReq\n";
+}
+void
+GUChordMessage::FingerReq::Serialize (Buffer::Iterator &start) const
+{
+        start.WriteHtonU32 (originatorNode.Get ());  
+        
+        start.WriteHtonU32(testIdentifiers.size());
+  
+        for (std::vector<std::string>::const_iterator it = testIdentifiers.begin(); it != testIdentifiers.end(); it++) {
+        start.WriteU16 ((*it).length());
+        start.Write ((uint8_t *) (const_cast<char*> ((*it).c_str())), (*it).length());
+        }
+        
+        start.WriteHtonU32(fingerEntries.size());
+  
+        for (std::vector<std::string>::const_iterator it = fingerEntries.begin(); it != fingerEntries.end(); it++) {
+        start.WriteU16 ((*it).length());
+        start.Write ((uint8_t *) (const_cast<char*> ((*it).c_str())), (*it).length());
+        }
+        
+        start.WriteHtonU32(fingerIps.size());
+  
+        for (std::vector<Ipv4Address>::const_iterator it = fingerIps.begin(); it != fingerIps.end(); it++) {
+        start.WriteHtonU32 ((*it).Get ());
+        }
+}
+uint32_t
+GUChordMessage::FingerReq::Deserialize (Buffer::Iterator &start)
+{
+        originatorNode = Ipv4Address (start.ReadNtohU32 ());
+        
+        uint32_t dlen = start.ReadNtohU32();
+          for (uint32_t i = 0; i < dlen; i++) {
+            uint16_t length = start.ReadU16 ();
+            char* str = (char*) malloc (length);
+            start.Read ((uint8_t*)str, length);
+            testIdentifiers.push_back(std::string (str, length));
+            free (str);
+          }
+
+        uint32_t dlen2 = start.ReadNtohU32();
+          for (uint32_t i = 0; i < dlen2; i++) {
+            uint16_t length = start.ReadU16 ();
+            char* str = (char*) malloc (length);
+            start.Read ((uint8_t*)str, length);
+            fingerEntries.push_back(std::string (str, length));
+            free (str);
+          }
+        
+        uint32_t dlen3 = start.ReadNtohU32();
+          for (uint32_t i = 0; i < dlen3; i++) {
+                fingerIps.push_back(Ipv4Address (start.ReadNtohU32 ()));            
+          }
+
+        return FingerReq::GetSerializedSize ();
+}
+void
+GUChordMessage::SetFingerReq (std::vector<std::string> testIds, std::vector<std::string> fingerEntries, std::vector<Ipv4Address> fingerIP, Ipv4Address originator)
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = FINGERME_REQ;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == FINGERME_REQ);
+      }        
+        m_message.fingerReq.originatorNode = originator;
+        m_message.fingerReq.testIdentifiers = testIds;
+        m_message.fingerReq.fingerEntries = fingerEntries;
+        m_message.fingerReq.fingerIps = fingerIP;
+}
+
+GUChordMessage::FingerReq
+GUChordMessage::GetFingerReq ()
+{
+  return m_message.fingerReq;
+}
 
 
+/**********************************      FINGER RSP     ************************************/
 
 
-/******************************************************************************************************/
+uint32_t
+GUChordMessage::FingerRsp::GetSerializedSize (void) const
+{
+  uint32_t size;
+  size = sizeof(uint16_t);
+  size += sizeof(uint32_t);
+
+  for (std::vector<std::string>::const_iterator it = fingerID.begin(); it != fingerID.end(); it++) {
+    size += sizeof(uint16_t);
+    size += (*it).length();
+  }
+
+  for (std::vector<Ipv4Address>::const_iterator it = fingerAddress.begin(); it != fingerAddress.end(); it++) {
+    size += sizeof(uint16_t) + (IPV4_ADDRESS_SIZE);
+  }
+
+  return size;
+}
+void
+GUChordMessage::FingerRsp::Print (std::ostream &os) const
+{
+  os << "FingerRsq\n";
+}
+void
+GUChordMessage::FingerRsp::Serialize (Buffer::Iterator &start) const
+{
+
+        start.WriteHtonU32(fingerID.size());
+  
+        for (std::vector<std::string>::const_iterator it = fingerID.begin(); it != fingerID.end(); it++) {
+        start.WriteU16 ((*it).length());
+        start.Write ((uint8_t *) (const_cast<char*> ((*it).c_str())), (*it).length());
+        }
+
+        start.WriteHtonU32(fingerAddress.size());
+  
+        for (std::vector<Ipv4Address>::const_iterator it = fingerAddress.begin(); it != fingerAddress.end(); it++) {
+        start.WriteHtonU32 ((*it).Get ());
+        }
+}
+uint32_t
+GUChordMessage::FingerRsp::Deserialize (Buffer::Iterator &start)
+{
+
+        uint32_t dlen2 = start.ReadNtohU32();
+          for (uint32_t i = 0; i < dlen2; i++) {
+            uint16_t length = start.ReadU16 ();
+            char* str = (char*) malloc (length);
+            start.Read ((uint8_t*)str, length);
+            fingerID.push_back(std::string (str, length));
+            free (str);
+          }
+
+        uint32_t dlen3 = start.ReadNtohU32();
+          for (uint32_t i = 0; i < dlen3; i++) {
+                fingerAddress.push_back(Ipv4Address (start.ReadNtohU32 ()));            
+          }
+
+        return FingerRsp::GetSerializedSize ();
+}
+void
+GUChordMessage::SetFingerRsp (std::vector<std::string> fingerNum, std::vector<Ipv4Address> fingerAddr)
+{
+   if (m_messageType == 0)
+      {
+        m_messageType = FINGERME_RSP;
+      }
+   else
+      {
+        NS_ASSERT (m_messageType == FINGERME_RSP);
+      }
+        m_message.fingerRsp.fingerID = fingerNum;
+        m_message.fingerRsp.fingerAddress = fingerAddr;
+}
+
+GUChordMessage::FingerRsp
+GUChordMessage::GetFingerRsp ()
+{
+  return m_message.fingerRsp;
+}
+
+/***************************************************************/
+
 void
 GUChordMessage::SetMessageType (MessageType messageType)
 {

@@ -21,6 +21,7 @@
 #include "ns3/ipv4-address.h"
 #include "ns3/packet.h"
 #include "ns3/object.h"
+#include <vector>
 
 using namespace ns3;
 
@@ -44,7 +45,9 @@ class GUChordMessage : public Header
         STABLE_RSP = 7,
         SET_PRED = 8,
         NOTIFY = 9,
-        CHORD_LEAVE = 10,    
+        CHORD_LEAVE = 10,
+        FINGERME_REQ = 11,
+        FINGERME_RSP = 12,    
       };
 
     GUChordMessage (GUChordMessage::MessageType messageType, uint32_t transactionId);
@@ -116,10 +119,10 @@ class GUChordMessage : public Header
         uint32_t Deserialize (Buffer::Iterator &start);
         // Payload
         std::string requesterID;
-        std::string landmarkSuccessor;
-        Ipv4Address landmarkSuccIP;
+        std::string landmarkID;
         Ipv4Address originatorAddress;
         Ipv4Address landmarkAddress;
+        
       };
     struct ChordJoinRsp
       {
@@ -189,6 +192,29 @@ class GUChordMessage : public Header
         Ipv4Address predecessorAddress;
         
       };
+    struct FingerReq
+        {
+          void Print (std::ostream &os) const;
+          uint32_t GetSerializedSize (void) const;
+          void Serialize (Buffer::Iterator &start) const;
+          uint32_t Deserialize (Buffer::Iterator &start);
+          //Payload
+          Ipv4Address originatorNode;
+          std::vector<std::string> testIdentifiers;
+          std::vector<std::string> fingerEntries;
+          std::vector<Ipv4Address> fingerIps;
+          
+        };
+    struct FingerRsp
+        {
+          void Print (std::ostream &os) const;
+          uint32_t GetSerializedSize (void) const;
+          void Serialize (Buffer::Iterator &start) const;
+          uint32_t Deserialize (Buffer::Iterator &start);
+          //Payload
+          std::vector<std::string> fingerID;
+          std::vector<Ipv4Address> fingerAddress;
+        };
 
 
 
@@ -205,6 +231,8 @@ class GUChordMessage : public Header
         SetPred setPredMessage;
         Notify notifyMessage;
         ChordLeave leaveMessage;
+        FingerReq fingerReq;
+        FingerRsp fingerRsp;
       } m_message;
     
   public:
@@ -234,7 +262,7 @@ class GUChordMessage : public Header
     
     ChordJoin GetChordJoin ();
    
-    void SetChordJoin (std::string rqID, std::string landmarkSucc, Ipv4Address lmSuccIP, Ipv4Address originAddr, Ipv4Address landmarkAddr);
+    void SetChordJoin (std::string rqID, std::string lmID, Ipv4Address originAddr, Ipv4Address landmarkAddr);
 
     ChordJoinRsp GetChordJoinRsp ();
     
@@ -263,6 +291,15 @@ class GUChordMessage : public Header
     ChordLeave GetChordLeave ();
         
     void SetChordLeave (std::string sId, std::string pId, Ipv4Address successor, Ipv4Address predecessor);
+
+    FingerReq GetFingerReq ();
+        
+    void SetFingerReq (std::vector<std::string> testIds, std::vector<std::string> fingerEntries, std::vector<Ipv4Address> fingerIP, Ipv4Address originator);
+
+    FingerRsp GetFingerRsp ();
+        
+    void SetFingerRsp (std::vector<std::string> fingerNum, std::vector<Ipv4Address> fingerAddr);
+    
 
 
 

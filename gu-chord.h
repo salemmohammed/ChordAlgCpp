@@ -33,6 +33,7 @@
 #include "ns3/timer.h"
 #include "ns3/uinteger.h"
 #include "ns3/boolean.h"
+#include "ns3/finger.h"
 
 using namespace ns3;
 
@@ -49,8 +50,11 @@ class GUChord : public GUApplication
     std::string GetNodeNumber();
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr);              //Compute Hash Value
+    std::string getFingerBound( Ipv4Address addr, uint32_t i );
+    void SetSelfToLandmark();   
 
-    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, Ipv4Address landmarkAddress, std::string nId);    //Method to send out join message to landmark node
+
+    void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
     void startSendingStableReq();
@@ -59,7 +63,8 @@ class GUChord : public GUApplication
     void SendSetPred(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr);
     void SendNotify(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr);
     void SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred, std::string sucIp, std::string predIp);
-    void SetSelfToLandmark();                         
+    void SendFingerReq(Ipv4Address destAddress, std::vector<std::string> testIds, std::vector<std::string> fingerEntries, std::vector<Ipv4Address> fingerIP, Ipv4Address originator);
+    void SendFingerRsp(Ipv4Address destAddress, std::vector<std::string> fingerNum, std::vector<Ipv4Address> fingerAddr);                      
 
     void ProcessPingReq (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessPingRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
@@ -70,7 +75,9 @@ class GUChord : public GUApplication
     void ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessSetPred(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
-    void ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessChordLeave(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
+    void ProcessFingerRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
 
     void AuditPings ();
     uint32_t GetNextTransactionId ();
@@ -114,8 +121,8 @@ class GUChord : public GUApplication
     std::string successor;      //next node
     std::string predecessor;    //previous node
     std::string nodeID;      //Computed ID
-    bool is_last;
-    bool is_landmark;
+    std::vector<std::string> fingerTestVals;
+    std::vector<Finger> fingerTable;    //Finger Table
 };
 
 #endif
