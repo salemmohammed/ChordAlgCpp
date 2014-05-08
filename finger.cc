@@ -13,10 +13,10 @@ void Finger::setFinger(std::string fingerNum, Ipv4Address fingerIP){
 std::string Finger::getFingerID() const{
 	return fingerID;
 }
-Ipv4Address Finger::getFinderAddr() const{
+Ipv4Address Finger::getFingerAddr() const{
 	return fingerAddress;
 }
-void Neighbor::printNeighbor(){
+void Finger::printFinger(){
 	std::string spaceSize = "	";
 	std::cout<<fingerID<<spaceSize<<fingerAddress<<std::endl;
 }

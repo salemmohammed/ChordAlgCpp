@@ -22,13 +22,14 @@
 #include "ns3/random-variable.h"
 #include "ns3/inet-socket-address.h"
 #include <openssl/sha.h>
+#include <algorithm>
 #include <stdio.h>
 #include <math.h>
 #include <string>
 #include <sstream>
 #include <iostream>
 
-#define M_VALUE 3
+#define M_VALUE 4
 
 using namespace ns3;
 
@@ -53,6 +54,12 @@ GUChord::GetTypeId ()
                  TimeValue (MilliSeconds (2000)),
                  MakeTimeAccessor (&GUChord::m_sendStableTimeout),
                  MakeTimeChecker ())
+    .AddAttribute ("SendFixFingerMessageTimeout",
+                 "Timeout value for FINGER_REQ in milliseconds",
+                 TimeValue (MilliSeconds (20000)),
+                 MakeTimeAccessor (&GUChord::m_fixFingerTimeout),
+                 MakeTimeChecker ())
+
     ;
   return tid;
 }
@@ -99,12 +106,20 @@ GUChord::StartApplication (void)
         std::string output = getFingerBound(m_mainAddress, i);
         fingerTestVals.push_back( output );
    }
+   std::sort (fingerTestVals.begin(),fingerTestVals.end());
+   std::cout <<"Node: " <<GetNodeNumber()<<" NodeID: "<<nodeID <<std::endl;
+   for(uint32_t i = 0; i < fingerTestVals.size(); i++){
+        std::cout <<"testID " <<i <<": " <<fingerTestVals.at(i) <<std::endl;
+    }
+  
   // Configure timers
   m_auditPingsTimer.SetFunction (&GUChord::AuditPings, this);
   m_sendStableTimer.SetFunction (&GUChord::startSendingStableReq, this);
+  m_fixFingerTimer.SetFunction (&GUChord::startSendingFixFinger, this);
   // Start timers
   m_auditPingsTimer.Schedule (m_pingTimeout);
   m_sendStableTimer.Schedule (m_sendStableTimeout);
+  m_fixFingerTimer.Schedule (m_fixFingerTimeout);
 }
 
 void
@@ -132,6 +147,16 @@ GUChord::startSendingStableReq(){
         SendStableReq(succIP);
 
         m_sendStableTimer.Schedule (m_sendStableTimeout);
+
+}
+void
+GUChord::startSendingFixFinger(){
+
+        std::vector<std::string> fentry;
+        std::vector<Ipv4Address> faddress;
+
+        SendFingerReq(succIP, fingerTestVals, fentry, faddress, m_mainAddress);
+        //m_fixFingerTimer.Schedule (m_fixFingerTimeout);
 
 }
 void
@@ -185,8 +210,13 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
         
                 SendStableReq(succIP);
         
-  }
+  }else if (command == "FINGERBANG"){
 
+        std::cout<<"\nNode "<<nodeID<<": "<<std::endl;
+        for( uint32_t i = 0; i < fingerTable.size(); i++ ){
+                std::cout<<"Finger["<<i<<"]: "<< fingerTable[i].getFingerID()<<std::endl;
+        }
+  }
 
 }
 
@@ -798,23 +828,32 @@ GUChord::ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uin
         std::vector<std::string> fingerIds = message.GetFingerReq().fingerEntries;
         std::vector<Ipv4Address> fingerAddrs = message.GetFingerReq().fingerIps;
         
-        std::cout <<"TestIDs Size: " <<testIds.size() <<std::endl;
+        //std::cout <<"TestIDs Size: " <<testIds.size() <<std::endl;
         if( succIP == origin ){
-                std::cout <<"succIP == origin" <<std::endl;
-                //SendFingerRsp(origin, fingerIds, fingerAddrs);
+                //std::cout <<"succIP == origin" <<std::endl;
+                /*for(uint32_t i = 0; i < fingerIds.size(); i++){
+                        std::cout <<"ID # " <<i <<": " <<fingerIds.at(i) <<std::endl;
+                }*/
+                SendFingerRsp(origin, fingerIds, fingerAddrs);
         }else{
                 if( !testIds.empty() ){
                         
-                        std::cout <<"testIDs not empty" <<std::endl;                                        
+                        //std::cout <<"testIDs not empty" <<std::endl;                                        
                         std::string ithvalue = testIds[testIds.size()-1];
+                        //std::cout <<"ith val: " <<ithvalue <<std::endl;
+                        //std::cout <<"node id: " <<nodeID <<std::endl;
 
                         if( nodeID < successor ){
 
-                                std::cout <<"nodeID < successor" <<std::endl;
+                                //std::cout <<"nodeID < successor" <<std::endl;
 
-                                if( ithvalue <= successor && ithvalue > nodeID ){
+                                /*if( ithvalue <= nodeID ){
+                                        testIds.pop_back();
+                                        fingerIds.push_back(nodeID);
+                                        fingerAddrs.push_back(m_mainAddress);
 
-                                        std::cout << "ithvalue <= successor && ithvalue > nodeID" <<std::endl;
+                                }else */if( successor >= ithvalue ){
+                                        //std::cout << "ithvalue > nodeID && ithvalue <= successor" <<std::endl;
                                         testIds.pop_back();
                                         fingerIds.push_back(successor);
                                         fingerAddrs.push_back(succIP);
@@ -822,20 +861,32 @@ GUChord::ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uin
 
                         }else if ( nodeID > successor ){
 
-                                if( ithvalue > nodeID || ithvalue == successor ){
+                                //std::cout <<"nodeID > successor" <<std::endl;
 
-                                        std::cout <<"ithvalue > nodeID || ithvalue == successor" <<std::endl;
+                                /*if( ithvalue <= nodeID ){
                                         testIds.pop_back();
-                                        fingerIds.push_back(successor);
-                                        fingerAddrs.push_back(succIP);
-                                }                                
+                                        fingerIds.push_back(nodeID);
+                                        fingerAddrs.push_back(m_mainAddress);
+
+                                }*/if( ithvalue > nodeID && ithvalue >= successor ){
+                                        //std::cout <<"ithvalue > nodeID || ithvalue <= successor" <<std::endl;
+                                        testIds.pop_back();
+                                        //if( fingerIds.size() != M_VALUE ){
+                                                fingerIds.push_back(successor);
+                                                fingerAddrs.push_back(succIP);
+                                        //}
+                                }                                                                
                         }
 
                         if( testIds.empty() ){
                                 SendFingerRsp(origin, fingerIds, fingerAddrs);
-                                std::cout<<"Sending Finger Response."<<std::endl;
+                                //std::cout<<"Sending Finger Response."<<std::endl;
+                                std::cout<<fingerIds.size()<<std::endl;
+                                for(uint32_t i = 0; i < fingerIds.size(); i++){
+                                        std::cout <<"ID # " <<i <<": " <<fingerIds.at(i) <<std::endl;
+                                }
                         }else{
-                                std::cout <<"still not empty" <<std::endl;
+                                //std::cout <<"still not empty" <<std::endl;
                                 SendFingerReq(succIP, testIds, fingerIds, fingerAddrs, origin);
                         }
                 }
@@ -844,6 +895,19 @@ GUChord::ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uin
 void
 GUChord::ProcessFingerRsp(GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort){
 
+        std::vector<std::string> fingerIds = message.GetFingerRsp().fingerID;
+        std::vector<Ipv4Address> fingerAddrs = message.GetFingerRsp().fingerAddress;
+
+                for( uint32_t i = 0; i < fingerIds.size(); i++ ){
+                        Finger fingEntry;
+                        fingEntry.setFinger(fingerIds[i], fingerAddrs[i]);
+                        fingerTable.push_back(fingEntry);
+                }
+                Finger fEntry;
+                fEntry.setFinger(successor, succIP);
+                if( !fingerTable.empty() )
+                        fingerTable[0] = fEntry;
+        
 }
 
 

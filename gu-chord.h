@@ -51,13 +51,15 @@ class GUChord : public GUApplication
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr);              //Compute Hash Value
     std::string getFingerBound( Ipv4Address addr, uint32_t i );
-    void SetSelfToLandmark();   
+    void SetSelfToLandmark();
+    void startSendingStableReq();
+    void startSendingFixFinger();   
 
 
     void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
-    void startSendingStableReq();
+    
     void SendStableReq(Ipv4Address destAddress);
     void SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4Address predecessorIp);
     void SendSetPred(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr);
@@ -103,11 +105,13 @@ class GUChord : public GUApplication
     Ptr<Socket> m_socket;
     Time m_pingTimeout;
     Time m_sendStableTimeout;
+    Time m_fixFingerTimeout;
     
     uint16_t m_appPort;
     // Timers
     Timer m_auditPingsTimer;
     Timer m_sendStableTimer;
+    Timer m_fixFingerTimer;
     // Ping tracker
     std::map<uint32_t, Ptr<PingRequest> > m_pingTracker;
     // Callbacks

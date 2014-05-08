@@ -884,7 +884,7 @@ GUChordMessage::FingerReq::GetSerializedSize (void) const
     size += sizeof(uint16_t) + (IPV4_ADDRESS_SIZE);
   }
 
-  return 10*size;
+  return 5*size;
 }
 void
 GUChordMessage::FingerReq::Print (std::ostream &os) const
@@ -989,7 +989,7 @@ GUChordMessage::FingerRsp::GetSerializedSize (void) const
     size += sizeof(uint16_t) + (IPV4_ADDRESS_SIZE);
   }
 
-  return size;
+  return 5*size;
 }
 void
 GUChordMessage::FingerRsp::Print (std::ostream &os) const
