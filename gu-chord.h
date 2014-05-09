@@ -28,6 +28,7 @@
 #include <set>
 #include <vector>
 #include <string>
+#include <gmp.h>
 #include "ns3/socket.h"
 #include "ns3/nstime.h"
 #include "ns3/timer.h"
@@ -47,6 +48,7 @@ class GUChord : public GUApplication
     void SendPing (Ipv4Address destAddress, std::string pingMessage);
     void RecvMessage (Ptr<Socket> socket);
 
+    void setMaxHash();
     std::string GetNodeNumber();
     Ipv4Address GetMainInterface ();   //retrieve device address
     std::string getNodeID(Ipv4Address addr);              //Compute Hash Value
@@ -59,7 +61,6 @@ class GUChord : public GUApplication
     void SendJoinRequest(Ipv4Address destAddress, Ipv4Address srcAddress, std::string srcId, Ipv4Address landmarkAddress, std::string landmarkId);    //Method to send out join message to landmark node
     void SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string newSuccessor);   //Method to send back the correct pred and succ to join requester
     void SendRingStateMessage(Ipv4Address destAddress, std::string srcNodeID);
-    
     void SendStableReq(Ipv4Address destAddress);
     void SendStableRsp(Ipv4Address destAddress, std::string predecessorId, Ipv4Address predecessorIp);
     void SendSetPred(Ipv4Address destAddress, std::string ndId, Ipv4Address ndAddr);
@@ -67,6 +68,7 @@ class GUChord : public GUApplication
     void SendLeaveRequest(Ipv4Address destAddress, Ipv4Address succ, Ipv4Address pred, std::string sucIp, std::string predIp);
     void SendFingerReq(Ipv4Address destAddress, std::vector<std::string> testIds, std::vector<std::string> fingerEntries, std::vector<Ipv4Address> fingerIP, Ipv4Address originator);
     void SendFingerRsp(Ipv4Address destAddress, std::vector<std::string> fingerNum, std::vector<Ipv4Address> fingerAddr);                      
+    void SendChordLookup (std::string lookupKey, uint32_t transId);
 
     void ProcessPingReq (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
     void ProcessPingRsp (GUChordMessage message, Ipv4Address sourceAddress, uint16_t sourcePort);
@@ -90,9 +92,21 @@ class GUChord : public GUApplication
     void SetPingFailureCallback (Callback <void, Ipv4Address, std::string> pingFailureFn);
     void SetPingRecvCallback (Callback <void, Ipv4Address, std::string> pingRecvFn);
 
+    void SetChordLookupCallback (Callback <void, Ipv4Address, uint32_t, std::string, uint32_t> chordLookupFn);
+    void SetChordLeaveCallback (Callback <void, Ipv4Address, uint32_t> chordLeaveFn);
+    void SetPredecessorChangeCallback (Callback <void, Ipv4Address, std::string> predecessorChangeFn);
+
+    
+
     // From GUApplication
     virtual void ProcessCommand (std::vector<std::string> tokens);
 
+    std::string successor;              //next node
+    std::string predecessor;            //previous node
+    std::string m_predecessor;
+    std::string m_predecessor_hash;
+    std::string m_chordIdentifier;      //Computed ID
+    mpz_t maxHash;
     
   protected:
     virtual void DoDispose ();
@@ -119,12 +133,13 @@ class GUChord : public GUApplication
     Callback <void, Ipv4Address, std::string> m_pingFailureFn;
     Callback <void, Ipv4Address, std::string> m_pingRecvFn;
 
+    Callback <void, Ipv4Address, uint32_t, std::string, uint32_t> m_chordLookupFn;
+    Callback <void, Ipv4Address, uint32_t> m_chordLeaveFn;
+    Callback <void, Ipv4Address, std::string> m_predecessorChangeFn;
+
     Ipv4Address m_mainAddress;
     Ipv4Address succIP;
     Ipv4Address predIP;
-    std::string successor;      //next node
-    std::string predecessor;    //previous node
-    std::string nodeID;      //Computed ID
     std::vector<std::string> fingerTestVals;
     std::vector<Finger> fingerTable;    //Finger Table
 };

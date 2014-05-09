@@ -97,17 +97,19 @@ GUChord::StartApplication (void)
       m_socket->SetRecvCallback (MakeCallback (&GUChord::RecvMessage, this));
     }
 
-    
+   
+   
    m_mainAddress = GetMainInterface();
-   nodeID = getNodeID(m_mainAddress);
+   m_chordIdentifier = getNodeID(m_mainAddress);
    predecessor = "";
+   m_predecessor = ReverseLookup(predIP);
 
    for( int i = M_VALUE-1; i >= 0; i-- ){
         std::string output = getFingerBound(m_mainAddress, i);
         fingerTestVals.push_back( output );
    }
    std::sort (fingerTestVals.begin(),fingerTestVals.end());
-   std::cout <<"Node: " <<GetNodeNumber()<<" NodeID: "<<nodeID <<std::endl;
+   std::cout <<"Node: " <<GetNodeNumber()<<" NodeID: "<<m_chordIdentifier <<std::endl;
    for(uint32_t i = 0; i < fingerTestVals.size(); i++){
         std::cout <<"testID " <<i <<": " <<fingerTestVals.at(i) <<std::endl;
     }
@@ -144,7 +146,7 @@ GUChord::StopApplication (void)
 void 
 GUChord::startSendingStableReq(){
 
-        if( successor != nodeID ){
+        if( successor != m_chordIdentifier ){
                 //std::cout<<"Sending Stable Resp"<<std::endl;
                 SendStableReq(succIP);
                 m_sendStableTimer.Schedule (m_sendStableTimeout);
@@ -195,7 +197,7 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
                 Ipv4Address lndmrkIP = ResolveNodeIpAddress(str);
                 std::cout<<"landmarkIP: "<<lndmrkIP<<std::endl;
                 std::string lndmrkID = "notset";                
-                SendJoinRequest(lndmrkIP, m_mainAddress, nodeID, lndmrkIP, lndmrkID);
+                SendJoinRequest(lndmrkIP, m_mainAddress, m_chordIdentifier, lndmrkIP, lndmrkID);
       }
       
   }else if (command == "LEAVE"){
@@ -209,24 +211,29 @@ GUChord::ProcessCommand (std::vector<std::string> tokens)
 
   }else if (command == "RINGSTATE"){
 
-        std::cout<<"\nPred ID: "<<predecessor<<"\nChord ID: " << nodeID << "\nSucc ID: " << successor << std::endl<<std::endl;
+        std::cout<<"\nPred ID: "<<predecessor<<"\nChord ID: " << m_chordIdentifier << "\nSucc ID: " << successor << std::endl<<std::endl;
 
-        CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << nodeID << " Successor: " << successor << " Predecessor: " << predecessor );
+        CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << m_chordIdentifier << " Successor: " << successor << " Predecessor: " << predecessor );
 
-        SendRingStateMessage(succIP, nodeID);
+        SendRingStateMessage(succIP, m_chordIdentifier);
   }else if (command == "STABILIZE"){
                 SendStableReq(succIP);
                 
   }else if (command == "FINGER"){
 
-        std::cout<<"\nNode "<<nodeID<<": "<<std::endl;
+        std::cout<<"\nNode "<<m_chordIdentifier<<": "<<std::endl;
         for( uint32_t i = 0; i < fingerTable.size(); i++ ){
                 std::cout<<"Finger["<<i<<"]: "<< fingerTable[i].getFingerID()<<std::endl;
         }
   }
 
 }
-
+void
+GUChord::setMaxHash(){
+ 
+ mpz_init(maxHash);
+ mpz_set_str(maxHash, "ffffffffffffffffffffffffffffffffffffffff", 16);
+}
 std::string
 GUChord::GetNodeNumber(){
 
@@ -302,8 +309,8 @@ GUChord::getFingerBound( Ipv4Address addr, uint32_t i ){
 //Set local node to be landmark node by changing boolean values and succ, predecessor
 void
 GUChord::SetSelfToLandmark(){
-        std::cout<<"Landmark: ID: "<< nodeID<< std::endl;
-        successor = nodeID;
+        std::cout<<"Landmark: ID: "<< m_chordIdentifier<< std::endl;
+        successor = m_chordIdentifier;
         succIP = m_mainAddress;
 } 
 
@@ -316,7 +323,7 @@ if (destAddress != Ipv4Address::GetAny ())
     {
 
       uint32_t transactionId = GetNextTransactionId ();
-      CHORD_LOG ("Sending CHORD_JOIN to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId << "Node ID: "<<nodeID);
+      CHORD_LOG ("Sending CHORD_JOIN to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId << "Node ID: "<<m_chordIdentifier);
       
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_JOIN, transactionId);
@@ -338,7 +345,7 @@ GUChord::SendJoinResponse(Ipv4Address destAddress, Ipv4Address succ, std::string
         if (destAddress != Ipv4Address::GetAny ())
     {
       uint32_t transactionId = GetNextTransactionId ();
-      CHORD_LOG ("Sending CHORD_JOIN_RSP to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId << " Node ID: "<<nodeID);
+      CHORD_LOG ("Sending CHORD_JOIN_RSP to Node: " << ReverseLookup(destAddress) << " IP: " << destAddress << " transactionId: " << transactionId << " Node ID: "<<m_chordIdentifier);
       
       Ptr<Packet> packet = Create<Packet> ();
       GUChordMessage message = GUChordMessage (GUChordMessage::CHORD_JOIN_RSP, transactionId);
@@ -548,6 +555,14 @@ GUChord::SendFingerRsp(Ipv4Address destAddress, std::vector<std::string> fingerN
 
 }
 
+void 
+GUChord::SendChordLookup (std::string lookupKey, uint32_t transId){
+
+
+
+
+}
+
 void
 GUChord::RecvMessage (Ptr<Socket> socket)
 {
@@ -612,20 +627,20 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
         Ipv4Address originAddress = message.GetChordJoin().originatorAddress;
         Ipv4Address landmarkIP = message.GetChordJoin().landmarkAddress;
 
-        CHORD_LOG ("Received JOIN_REQ from Node: " << ReverseLookup(sourceAddress) << "Message Node ID: "<<messageNodeID <<" IP: " << m_mainAddress << "Node ID: "<<nodeID);
+        CHORD_LOG ("Received JOIN_REQ from Node: " << ReverseLookup(sourceAddress) << "Message Node ID: "<<messageNodeID <<" IP: " << m_mainAddress << "Node ID: "<<m_chordIdentifier);
  
-        std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< nodeID << " Successor: " << successor << " Pred: " << predecessor << std::endl;
+        std::cout<<"Recieved join request message with messageNodeID: "<< messageNodeID << "mainAddress: " << m_mainAddress << " originAddress: "<< originAddress << " node ID: "<< m_chordIdentifier << " Successor: " << successor << " Pred: " << predecessor << std::endl;
         
 
         if( landmID == "notset" && m_mainAddress != succIP ){
                 std::cout<<"LMID NOT SET"<<std::endl;
-                //SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+                //SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, m_chordIdentifier);
 
-                if( nodeID < successor && messageNodeID > successor ){
+                if( m_chordIdentifier < successor && messageNodeID > successor ){
                         //std::cout<<"non-wraparound case. pass node."<<std::endl;
-                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, m_chordIdentifier);
                         
-                }else if( nodeID < successor && messageNodeID < successor ){
+                }else if( m_chordIdentifier < successor && messageNodeID < successor ){
                         
                         //std::cout<<"non-wraparound case. place node."<<std::endl;
                 
@@ -633,10 +648,10 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
                         
                         succIP = originAddress;
                         successor = messageNodeID;
-                }else if( nodeID > successor && messageNodeID > successor ){
+                }else if( m_chordIdentifier > successor && messageNodeID > successor ){
                         //std::cout<<"wraparound case. pass node."<<std::endl;
         
-                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, nodeID);
+                        SendJoinRequest(succIP, originAddress, messageNodeID, m_mainAddress, m_chordIdentifier);
                 }else{
                         //std::cout<<"wraparound case. place node."<<
                         SendJoinResponse(originAddress, succIP, successor);
@@ -645,26 +660,26 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
                         successor = messageNodeID;
                 }
                                                        
-        }else if( successor == nodeID ){
+        }else if( successor == m_chordIdentifier ){
 
-                SendJoinResponse(originAddress, m_mainAddress, nodeID);
+                SendJoinResponse(originAddress, m_mainAddress, m_chordIdentifier);
                 
                 succIP = originAddress;
                 successor = messageNodeID;
 
         } else if( successor == landmID ){
                 
-                if( messageNodeID < successor && nodeID < successor ){
+                if( messageNodeID < successor && m_chordIdentifier < successor ){
                         
                         SendJoinResponse(originAddress, succIP, successor);
                         
                         succIP = originAddress;
                         successor = messageNodeID;
  
-                } else if( messageNodeID > successor && nodeID < successor){
+                } else if( messageNodeID > successor && m_chordIdentifier < successor){
 
                         SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
-                }else if( messageNodeID > nodeID && nodeID > successor){
+                }else if( messageNodeID > m_chordIdentifier && m_chordIdentifier > successor){
 
                         SendJoinResponse(originAddress, succIP, successor);
                         
@@ -676,11 +691,11 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
 
         } else if( successor != landmID ){
                 
-                if( nodeID < successor && messageNodeID > successor ){
+                if( m_chordIdentifier < successor && messageNodeID > successor ){
                         //std::cout<<"non-wraparound case. pass node."<<std::endl;
                         SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
                         
-                }else if( nodeID < successor && messageNodeID < successor ){
+                }else if( m_chordIdentifier < successor && messageNodeID < successor ){
                         
                         //std::cout<<"non-wraparound case. place node."<<std::endl;
                 
@@ -688,7 +703,7 @@ GUChord::ProcessChordJoin (GUChordMessage message, Ipv4Address sourceAddress, ui
                         
                         succIP = originAddress;
                         successor = messageNodeID;
-                }else if( nodeID > successor && messageNodeID > successor ){
+                }else if( m_chordIdentifier > successor && messageNodeID > successor ){
                         //std::cout<<"wraparound case. pass node."<<std::endl;
         
                         SendJoinRequest(succIP, originAddress, messageNodeID, landmarkIP, landmID);
@@ -716,7 +731,7 @@ GUChord::ProcessChordJoinRsp (GUChordMessage message, Ipv4Address sourceAddress,
 
         //SendFingerReq(succIP, fingerTestVals, fentry, faddress, m_mainAddress);
         
-        std::cout<<"Changing successor of Node ID: "<< nodeID << " to: "<< succIP <<", Node ID: " << successor << std::endl;
+        std::cout<<"Changing successor of Node ID: "<< m_chordIdentifier << " to: "<< succIP <<", Node ID: " << successor << std::endl;
 
 }
 
@@ -725,10 +740,10 @@ GUChord::PrintRingState(GUChordMessage message, Ipv4Address sourceAddress, uint1
 
         std::string origin = message.GetRingState().originatorNodeID;
 
-        if(  origin != nodeID ){
-                CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << nodeID << " Successor: " << successor << " Predecessor: " << predecessor );
+        if(  origin != m_chordIdentifier ){
+                CHORD_LOG ("Network Node: " << ReverseLookup(GetMainInterface()) << " Node ID: " << m_chordIdentifier << " Successor: " << successor << " Predecessor: " << predecessor );
 
-                std::cout<<"Pred ID: "<<predecessor<<"\nChord ID: " << nodeID << "\nSucc ID: " << successor << std::endl<<std::endl;
+                std::cout<<"Pred ID: "<<predecessor<<"\nChord ID: " << m_chordIdentifier << "\nSucc ID: " << successor << std::endl<<std::endl;
                 
                 SendRingStateMessage(succIP, origin);
 
@@ -744,7 +759,7 @@ GUChord::ProcessStableReq(GUChordMessage message, Ipv4Address sourceAddress, uin
                 
                 if( predecessor == "" ){
                         //std::cout<<"not set"<<std::endl;
-                        SendStableRsp(sourceAddress, nodeID, m_mainAddress);
+                        SendStableRsp(sourceAddress, m_chordIdentifier, m_mainAddress);
                 }else{
                         //std::cout<<"set"<<std::endl;
                         SendStableRsp(sourceAddress, predecessor, predIP);
@@ -761,21 +776,21 @@ GUChord::ProcessStableRsp(GUChordMessage message, Ipv4Address sourceAddress, uin
         Ipv4Address prdIP = message.GetStableRsp().predAddress;
 
         if( prdID == successor )
-                SendSetPred(succIP, nodeID, m_mainAddress);
+                SendSetPred(succIP, m_chordIdentifier, m_mainAddress);
         
 
-        if( (nodeID < successor && prdID > nodeID && prdID < successor) || (nodeID > successor && prdID < nodeID && prdID < successor) ){
+        if( (m_chordIdentifier < successor && prdID > m_chordIdentifier && prdID < successor) || (m_chordIdentifier > successor && prdID < m_chordIdentifier && prdID < successor) ){
                 
                 successor = prdID;
                 succIP = prdIP;
-                //std::cout<<"Changing successor of NODE ID: "<<nodeID<<"\nto: "<<successor;
+                //std::cout<<"Changing successor of NODE ID: "<<m_chordIdentifier<<"\nto: "<<successor;
         }
         //Send a notify message to predecessor
 
         //std::cout<<"Sending notify to: "<<prdIP <<std::endl;
-        SendNotify(succIP, nodeID, m_mainAddress);
+        SendNotify(succIP, m_chordIdentifier, m_mainAddress);
 
-        /*if( prdID > nodeID && prdID < successor ){
+        /*if( prdID > m_chordIdentifier && prdID < successor ){
                 successor = prdID;
                 succIP = prdIP;
         }*/
@@ -790,12 +805,12 @@ GUChord::ProcessSetPred(GUChordMessage message, Ipv4Address sourceAddress, uint1
         std::string setPredID = message.GetSetPred().newPredID;
         Ipv4Address setPredIP = message.GetSetPred().newPredIP;
         
-        if( predecessor == "" || ( predecessor < nodeID && setPredID > predecessor && setPredID < nodeID ) || ( predecessor > nodeID && setPredID > predecessor && setPredID > nodeID ) ){
+        if( predecessor == "" || ( predecessor < m_chordIdentifier && setPredID > predecessor && setPredID < m_chordIdentifier ) || ( predecessor > m_chordIdentifier && setPredID > predecessor && setPredID > m_chordIdentifier ) ){
                         
                 predecessor = setPredID;
                 predIP = setPredIP;
         }
-        //std::cout<<"Node ID: "<<nodeID<<"\nNew predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
+        //std::cout<<"Node ID: "<<m_chordIdentifier<<"\nNew predecessor: "<< predecessor << "  Pred IP: "<<predIP <<std::endl;
 
 }
 
@@ -806,8 +821,8 @@ GUChord::ProcessNotify(GUChordMessage message, Ipv4Address sourceAddress, uint16
         Ipv4Address messageNodeIP = message.GetNotify().potentialPredIP;
         //std::string successor
         
-        if( predecessor == "" || messageNodeID > predecessor || (nodeID > successor && messageNodeID < predecessor )){
-                //std::cout<<"Predecessor for node: "<<nodeID<<" changed to "<<messageNodeID<<std::endl;
+        if( predecessor == "" || messageNodeID > predecessor || (m_chordIdentifier > successor && messageNodeID < predecessor )){
+                //std::cout<<"Predecessor for node: "<<m_chordIdentifier<<" changed to "<<messageNodeID<<std::endl;
                 predecessor = messageNodeID;                
                 predIP = messageNodeIP;
         }
@@ -822,11 +837,11 @@ GUChord::ProcessChordLeave (GUChordMessage message, Ipv4Address sourceAddress, u
         std::string successorID = message.GetChordLeave().successorID;
 
         std::cout<<"successor is: "<<successorID<<"  predecessor is: "<<predecessorID<<std::endl;
-        if( nodeID == successorID ){
+        if( m_chordIdentifier == successorID ){
                 predecessor = predecessorID;
                 predIP = predecessorIP;
                 std::cout<<"Successor notified of leave.  New Pred ID: "<<predecessor<<std::endl;
-        }else if( nodeID == predecessorID ){;
+        }else if( m_chordIdentifier == predecessorID ){;
                 successor = successorID;
                 succIP = successorIP;
                 std::cout<<"Predecessor notified of leave. New Succ ID: "<<successor<<std::endl;
@@ -854,35 +869,35 @@ GUChord::ProcessFingerReq(GUChordMessage message, Ipv4Address sourceAddress, uin
                         //std::cout <<"testIDs not empty" <<std::endl;                                        
                         std::string ithvalue = testIds[testIds.size()-1];
                         //std::cout <<"ith val: " <<ithvalue <<std::endl;
-                        //std::cout <<"node id: " <<nodeID <<std::endl;
+                        //std::cout <<"node id: " <<m_chordIdentifier <<std::endl;
 
-                        if( nodeID < successor ){
+                        if( m_chordIdentifier < successor ){
 
-                                //std::cout <<"nodeID < successor" <<std::endl;
+                                //std::cout <<"m_chordIdentifier < successor" <<std::endl;
 
-                                /*if( ithvalue <= nodeID ){
+                                /*if( ithvalue <= m_chordIdentifier ){
                                         testIds.pop_back();
-                                        fingerIds.push_back(nodeID);
+                                        fingerIds.push_back(m_chordIdentifier);
                                         fingerAddrs.push_back(m_mainAddress);
 
                                 }else */if( successor >= ithvalue ){
-                                        //std::cout << "ithvalue > nodeID && ithvalue <= successor" <<std::endl;
+                                        //std::cout << "ithvalue > m_chordIdentifier && ithvalue <= successor" <<std::endl;
                                         testIds.pop_back();
                                         fingerIds.push_back(successor);
                                         fingerAddrs.push_back(succIP);
                                 }
 
-                        }else if ( nodeID > successor ){
+                        }else if ( m_chordIdentifier > successor ){
 
-                                //std::cout <<"nodeID > successor" <<std::endl;
+                                //std::cout <<"m_chordIdentifier > successor" <<std::endl;
 
-                                /*if( ithvalue <= nodeID ){
+                                /*if( ithvalue <= m_chordIdentifier ){
                                         testIds.pop_back();
-                                        fingerIds.push_back(nodeID);
+                                        fingerIds.push_back(m_chordIdentifier);
                                         fingerAddrs.push_back(m_mainAddress);
 
-                                }*/if( ithvalue > nodeID && ithvalue >= successor ){
-                                        //std::cout <<"ithvalue > nodeID || ithvalue <= successor" <<std::endl;
+                                }*/if( ithvalue > m_chordIdentifier && ithvalue >= successor ){
+                                        //std::cout <<"ithvalue > m_chordIdentifier || ithvalue <= successor" <<std::endl;
                                         testIds.pop_back();
                                         //if( fingerIds.size() != M_VALUE ){
                                                 fingerIds.push_back(successor);
@@ -1044,4 +1059,20 @@ GUChord::SetPingRecvCallback (Callback <void, Ipv4Address, std::string> pingRecv
   m_pingRecvFn = pingRecvFn;
 }
 
+void
+GUChord::SetChordLookupCallback (Callback <void, Ipv4Address, uint32_t, std::string, uint32_t> chordLookupFn)
+{
+  m_chordLookupFn = chordLookupFn;
+}
 
+void
+GUChord::SetChordLeaveCallback (Callback <void, Ipv4Address, uint32_t> chordLeaveFn)
+{
+  m_chordLeaveFn = chordLeaveFn;
+}
+
+void
+GUChord::SetPredecessorChangeCallback (Callback <void, Ipv4Address, std::string> predecessorChangeFn)
+{
+  m_predecessorChangeFn = predecessorChangeFn;
+}
