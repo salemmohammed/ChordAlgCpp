@@ -290,7 +290,7 @@ class GUChordMessage : public Header
 
     ChordLeave GetChordLeave ();
         
-    void SetChordLeave (std::string sId, std::string pId, Ipv4Address successor, Ipv4Address predecessor);
+    void SetChordLeave (Ipv4Address successor, Ipv4Address predecessor, std::string sId, std::string pId);
 
     FingerReq GetFingerReq ();
         

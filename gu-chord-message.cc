@@ -796,7 +796,7 @@ GUChordMessage::ChordLeave::GetSerializedSize (void) const
 {
   uint32_t size;
   size = (2*IPV4_ADDRESS_SIZE) + sizeof(uint16_t) + successorID.length() + predecessorID.length();
-  return 30*size;
+  return 10*size;
 }
 void
 GUChordMessage::ChordLeave::Print (std::ostream &os) const
@@ -839,7 +839,7 @@ GUChordMessage::ChordLeave::Deserialize (Buffer::Iterator &start)
         return ChordLeave::GetSerializedSize ();
 }
 void
-GUChordMessage::SetChordLeave ( std::string sId, std::string pId, Ipv4Address successor, Ipv4Address predecessor)
+GUChordMessage::SetChordLeave ( Ipv4Address successor, Ipv4Address predecessor, std::string sId, std::string pId )
 {
    if (m_messageType == 0)
       {
@@ -849,7 +849,8 @@ GUChordMessage::SetChordLeave ( std::string sId, std::string pId, Ipv4Address su
       {
         NS_ASSERT (m_messageType == CHORD_LEAVE);
       }
-        
+        m_message.leaveMessage.successorID = sId;
+        m_message.leaveMessage.predecessorID = pId;
         m_message.leaveMessage.successorAddress = successor;
         m_message.leaveMessage.predecessorAddress = predecessor;
 }
